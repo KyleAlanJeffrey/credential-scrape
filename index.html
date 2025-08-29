@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GitHub Secret Scanner — Your Repos Only (Local)</title>
+  <style>
+    :root {
+      --bg: #0b1320; --panel: #121a2a; --muted: #7182a7; --text: #e6edf3; --accent: #7aa2ff; --danger:#ff6b6b; --ok:#6be675; --warn:#ffcf6b;
+    }
+    html, body { height: 100%; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: linear-gradient(180deg, var(--bg), #0f172a 70%);
+      color: var(--text);
+    }
+    header { padding: 24px 16px 8px; text-align: center; }
+    header h1 { margin: 0 0 8px; font-weight: 700; letter-spacing: 0.2px; }
+    header p { margin: 0; color: var(--muted); }
+
+    .container { max-width: 1100px; margin: 18px auto 64px; padding: 0 16px; }
+    .panel { background: var(--panel); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.35); }
+    .grid { display: grid; gap: 12px; }
+    @media(min-width: 900px){ .grid-cols-2 { grid-template-columns: 1.5fr 1fr; } }
+
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    input[type="text"],input[type="password"],textarea,select {
+      width: 100%; background: #0f1627; color: var(--text); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px; padding: 10px 12px; box-sizing: border-box; outline: none;
+    }
+    textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+
+    .row { display:flex; gap:12px; align-items:center; flex-wrap: wrap; }
+    .row > * { flex: 1 1 200px; }
+
+    .btn {
+      background: #19233a; color: var(--text); border: 1px solid rgba(255,255,255,0.08);
+      padding: 10px 14px; border-radius: 10px; cursor: pointer; font-weight: 600;
+      transition: transform 0.02s ease, background 0.2s ease, border-color 0.2s ease;
+    }
+    .btn:hover { background: #1d2845; }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary { background: var(--accent); color: #0b1020; border-color: transparent; }
+    .btn.danger { background: var(--danger); color: #0b1020; border-color: transparent; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .help { color: var(--muted); font-size: 13px; }
+
+    .status { display: grid; grid-template-columns: repeat(4, minmax(120px, 1fr)); gap: 10px; margin-top: 10px; }
+    .stat { background: #0e1526; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; padding: 10px; }
+    .stat .label { color: var(--muted); font-size: 12px; }
+    .stat .val { font-size: 18px; font-weight: 700; }
+
+    .progressbar { height: 10px; background: rgba(255,255,255,0.07); border-radius: 999px; overflow: hidden; }
+    .progressbar > div { height: 100%; width: 0%; background: linear-gradient(90deg, var(--accent), #76e3ff); transition: width 0.2s ease; }
+
+    .results { margin-top: 18px; }
+    .match { background: #0e1526; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+    .match .hdr { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #1b2642; border: 1px solid rgba(255,255,255,0.08); color: #b9c7f6; }
+    .badge.warn { background: #3b2c14; color: #ffd591; }
+    .badge.crit { background: #3b1919; color: #ffb3b3; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    pre { white-space: pre-wrap; background: #0b1020; border-radius: 10px; padding: 10px; border: 1px solid rgba(255,255,255,0.06); }
+
+    .footer-note { margin-top: 18px; color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>GitHub Secret Scanner</h1>
+    <p>Local, browser-only utility to scan <strong>your own repositories</strong> for accidental credentials.</p>
+    <p class="help">Uses the official GitHub API. Your token never leaves this page. Please respect GitHub's Terms of Service and scan only what you own.</p>
+  </header>
+
+  <div class="container grid grid-cols-2">
+    <section class="panel">
+      <h2>Setup</h2>
+      <div class="grid">
+        <div>
+          <label>GitHub Personal Access Token (fine-grained or classic)</label>
+          <input id="token" type="password" autocomplete="off" placeholder="ghp_... or github_pat_..." required>
+          <div class="help">Minimum scopes: <code>repo</code> (to include private) and <code>read:org</code> if your private repos are in orgs. Classic token: check <em>repo</em>. Fine-grained: grant read-only contents.</div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Target GitHub username (must match token owner)</label>
+            <input id="username" type="text" placeholder="your-github-handle" required>
+          </div>
+          <div>
+            <label>Max file size (KB)</label>
+            <input id="maxSizeKB" type="text" value="512">
+          </div>
+        </div>
+        <div class="row">
+          <label style="flex: 0 0 auto"><input id="includePrivate" type="checkbox" checked> Include private repos</label>
+          <label style="flex: 0 0 auto"><input id="includeForks" type="checkbox"> Include forks</label>
+          <label style="flex: 0 0 auto"><input id="includeArchived" type="checkbox"> Include archived</label>
+          <label style="flex: 0 0 auto"><input id="respectGitignore" type="checkbox" checked> Skip common build/vendor dirs</label>
+        </div>
+        <div class="row">
+          <button id="startBtn" class="btn primary">Start scan</button>
+          <button id="stopBtn" class="btn danger" disabled>Stop</button>
+          <button id="exportBtn" class="btn" disabled>Export JSON</button>
+        </div>
+      </div>
+
+      <div style="margin-top:14px">
+        <div class="progressbar"><div id="bar"></div></div>
+        <div class="status" style="margin-top:10px">
+          <div class="stat"><div class="label">Repos</div><div class="val" id="stat-repos">0</div></div>
+          <div class="stat"><div class="label">Files scanned</div><div class="val" id="stat-files">0</div></div>
+          <div class="stat"><div class="label">Matches</div><div class="val" id="stat-matches">0</div></div>
+          <div class="stat"><div class="label">Rate limit</div><div class="val" id="stat-rate">—</div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Patterns</h2>
+      <p class="help">Edit as needed. JavaScript RegExp syntax. Each entry is <code>{ name, regex, flags, severity }</code>. Default set focuses on common accidental leaks.</p>
+      <textarea id="patterns" rows="22"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button id="resetPatterns" class="btn">Reset defaults</button>
+      </div>
+      <p class="footer-note">Tip: Keep the set small to reduce false positives and API usage. This tool scans text files only and skips large/binary paths.</p>
+    </section>
+  </div>
+
+  <div class="container">
+    <section class="panel">
+      <h2>Results</h2>
+      <div id="results" class="results"></div>
+    </section>
+  </div>
+
+  <script>
+  // ==========================
+  // Utility helpers
+  // ==========================
+  const $ = (sel) => document.querySelector(sel);
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  const DEFAULT_PATTERNS = [
+    { name: "AWS Access Key ID", regex: "AKIA[0-9A-Z]{16}", flags: "g", severity: "high" },
+    { name: "AWS Secret Access Key", regex: "aws(.{0,20})?(secret|access).{0,20}[\"'][0-9a-zA-Z/+]{40}[\"']", flags: "gi", severity: "high" },
+    { name: "GitHub Token (classic)", regex: "(?:ghp|gho|ghu|ghs|ghr)_[0-9A-Za-z]{36}", flags: "g", severity: "high" },
+    { name: "GitHub Token (fine-grained)", regex: "github_pat_[0-9A-Za-z_]{50,255}", flags: "g", severity: "high" },
+    { name: "Google API Key", regex: "AIza[0-9A-Za-z_\-]{35}", flags: "g", severity: "high" },
+    { name: "Slack Token", regex: "xox[baprs]-[0-9A-Za-z-]{10,48}", flags: "g", severity: "high" },
+    { name: "Slack Webhook", regex: "https://hooks\\.slack\\.com/services/[A-Za-z0-9/]{20,}", flags: "g", severity: "high" },
+    { name: "Private Key Header", regex: "-----BEGIN (?:EC|RSA|OPENSSH|DSA) PRIVATE KEY-----", flags: "g", severity: "critical" },
+    { name: "Generic Password Assignments", regex: "\\b(password|passwd|pwd|secret|token)\\b\\s*[:=]\\s*[\"'][^\"'\\n]{6,}[\"']", flags: "gi", severity: "medium" },
+    { name: "JWT", regex: "eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}", flags: "g", severity: "medium" }
+  ];
+
+  const DEFAULT_IGNORE_DIRS = [
+    "node_modules/", "vendor/", "dist/", "build/", "target/", ".next/", ".git/", ".cache/", "__pycache__/", "venv/", ".venv/", ".gradle/", ".idea/"
+  ];
+
+  const textDecoder = new TextDecoder("utf-8", { fatal: false });
+
+  function human(n){ return n.toLocaleString(); }
+
+  function looksBinary(uint8) {
+    // Heuristic: too many zero bytes or non-text control chars
+    const len = Math.min(uint8.length, 2048);
+    let zeros = 0, ctl = 0;
+    for (let i=0; i<len; i++) {
+      const b = uint8[i];
+      if (b === 0) zeros++;
+      if (b < 7 || (b > 13 && b < 32)) ctl++;
+    }
+    return zeros > 0 || ctl / len > 0.3;
+  }
+
+  function compilePatterns(list){
+    return list.map(p => ({...p, re: new RegExp(p.regex, p.flags || "g")}));
+  }
+
+  function matchFile(content, compiled) {
+    const lines = content.split(/\r?\n/);
+    const matches = [];
+    for (let i=0; i<lines.length; i++) {
+      const line = lines[i];
+      for (const p of compiled) {
+        p.re.lastIndex = 0;
+        let m;
+        while ((m = p.re.exec(line)) !== null) {
+          const start = Math.max(0, m.index - 60);
+          const end = Math.min(line.length, m.index + (m[0]?.length || 0) + 60);
+          const snippet = line.slice(start, end);
+          matches.push({ pattern: p.name, severity: p.severity || 'medium', line: i+1, match: m[0], snippet });
+          if (!p.re.global) break; // avoid infinite loop for zero-length
+        }
+      }
+    }
+    return matches;
+  }
+
+  function renderRateLimit(headers){
+    const remain = headers.get('x-ratelimit-remaining');
+    const limit = headers.get('x-ratelimit-limit');
+    const reset = headers.get('x-ratelimit-reset');
+    let extra = '';
+    if (reset) {
+      const resetDate = new Date(parseInt(reset,10)*1000);
+      extra = ` (resets ${resetDate.toLocaleTimeString()})`;
+    }
+    $("#stat-rate").textContent = remain && limit ? `${remain}/${limit}${extra}` : '—';
+  }
+
+  // ==========================
+  // GitHub API client with throttling & abort
+  // ==========================
+  function githubClient(token, signal){
+    const base = 'https://api.github.com';
+    const headersBase = {
+      'Accept': 'application/vnd.github+json',
+      'Authorization': `Bearer ${token}`
+    };
+
+    let queue = Promise.resolve();
+    const delayMs = 80; // gentle pacing
+
+    async function request(path, init={}){
+      await (queue = queue.then(() => sleep(delayMs)));
+      const res = await fetch(base + path, { ...init, headers: { ...headersBase, ...(init.headers||{}) }, signal });
+      renderRateLimit(res.headers);
+      if (res.status === 403) {
+        // Could be secondary rate limit; surface message
+        const text = await res.text();
+        throw new Error(`GitHub API 403: ${text.slice(0,200)}...`);
+      }
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`GitHub API ${res.status}: ${text}`);
+      }
+      const json = await res.json();
+      return { json, headers: res.headers };
+    }
+
+    async function paged(path){
+      let url = path, out = [], headers;
+      while (url) {
+        const res = await request(url);
+        headers = res.headers;
+        out = out.concat(res.json);
+        const link = headers.get('link');
+        if (link && link.includes('rel="next"')) {
+          const m = link.match(/<([^>]+)>; rel="next"/);
+          url = m ? m[1].replace(base,'') : null;
+        } else url = null;
+      }
+      return { items: out, headers };
+    }
+
+    return { request, paged };
+  }
+
+  // ==========================
+  // Scanner logic
+  // ==========================
+  let abortController = null;
+
+  async function startScan(){
+    const token = $("#token").value.trim();
+    const username = $("#username").value.trim();
+    const maxSizeKB = Math.max(1, parseInt($("#maxSizeKB").value, 10) || 512);
+    const includePrivate = $("#includePrivate").checked;
+    const includeForks = $("#includeForks").checked;
+    const includeArchived = $("#includeArchived").checked;
+    const respectGitignore = $("#respectGitignore").checked;
+
+    if (!token || !username) { alert('Token and username are required.'); return; }
+
+    // Read patterns
+    let patterns;
+    try {
+      patterns = JSON.parse($("#patterns").value);
+      if (!Array.isArray(patterns)) throw new Error('Patterns must be an array');
+    } catch (e) {
+      alert('Patterns JSON is invalid. ' + e.message);
+      return;
+    }
+    const compiled = compilePatterns(patterns);
+
+    // Prepare UI
+    $("#results").innerHTML = '';
+    $("#stat-repos").textContent = '0';
+    $("#stat-files").textContent = '0';
+    $("#stat-matches").textContent = '0';
+    $("#bar").style.width = '0%';
+
+    abortController = new AbortController();
+    const signal = abortController.signal;
+    $("#startBtn").disabled = true; $("#stopBtn").disabled = false; $("#exportBtn").disabled = true;
+
+    const client = githubClient(token, signal);
+
+    try {
+      // 1) Verify identity
+      const me = await client.request('/user');
+      const login = me.json.login;
+      if (!login || login.toLowerCase() !== username.toLowerCase()) {
+        throw new Error(`For safety, this tool only scans the token owner's repos. Token user is \"${login}\", but target username is \"${username}\".`);
+      }
+
+      // 2) Load repos
+      const vis = includePrivate ? 'all' : 'public';
+      const { items: repos } = await client.paged(`/user/repos?per_page=100&affiliation=owner&visibility=${vis}&sort=updated`);
+      const filtered = repos.filter(r => (includeForks || !r.fork) && (includeArchived || !r.archived) && r.owner?.login?.toLowerCase() === login.toLowerCase());
+      $("#stat-repos").textContent = human(filtered.length);
+
+      // 3) For each repo, get tree and enqueue file scans
+      const jobs = [];
+      const IGNORE_DIRS = respectGitignore ? DEFAULT_IGNORE_DIRS : [];
+      let totalFiles = 0;
+      for (const repo of filtered) {
+        const branch = repo.default_branch || 'main';
+        const { json: treeRes } = await client.request(`/repos/${repo.owner.login}/${repo.name}/git/trees/${encodeURIComponent(branch)}?recursive=1`);
+        const tree = treeRes.tree || [];
+        const files = tree.filter(e => e.type === 'blob');
+        for (const f of files) {
+          const path = f.path + (f.path.endsWith('/') ? '' : '');
+          const ignore = IGNORE_DIRS.some(dir => f.path.startsWith(dir));
+          if (ignore) continue;
+          if (typeof f.size === 'number' && f.size > (maxSizeKB * 1024)) continue;
+          totalFiles++;
+          jobs.push(async () => {
+            // Fetch file content via contents API
+            const { json: file } = await client.request(`/repos/${repo.owner.login}/${repo.name}/contents/${encodeURIComponent(f.path)}?ref=${encodeURIComponent(branch)}`);
+            if (!file || file.type !== 'file' || !file.content) return [];
+            // Decode base64
+            const raw = atob(file.content.replace(/\n/g,''));
+            // Convert to Uint8Array
+            const uint8 = new Uint8Array(raw.length);
+            for (let i=0; i<raw.length; i++) uint8[i] = raw.charCodeAt(i);
+            if (looksBinary(uint8)) return [];
+            const text = textDecoder.decode(uint8);
+            const matches = matchFile(text, compiled).map(m => ({
+              repo: `${repo.owner.login}/${repo.name}`,
+              branch, path: f.path, html_url: `https://github.com/${repo.owner.login}/${repo.name}/blob/${encodeURIComponent(branch)}/${f.path}#L${m.line}`,
+              ...m
+            }));
+            return matches;
+          });
+        }
+      }
+
+      // 4) Process jobs with limited concurrency
+      const CONCURRENCY = 3;
+      let inFlight = 0, idx = 0, filesDone = 0, allMatches = [];
+
+      async function runNext(){
+        if (signal.aborted) return;
+        if (idx >= jobs.length) return;
+        const i = idx++;
+        inFlight++;
+        try {
+          const res = await jobs[i]();
+          filesDone++; $("#stat-files").textContent = human(filesDone);
+          const pct = totalFiles ? Math.round((filesDone / totalFiles) * 100) : 0;
+          $("#bar").style.width = `${pct}%`;
+          if (res && res.length) {
+            allMatches = allMatches.concat(res);
+            $("#stat-matches").textContent = human(allMatches.length);
+            for (const m of res) addMatchCard(m);
+          }
+        } catch (e) {
+          addErrorCard(e.message);
+        } finally {
+          inFlight--;
+          if (idx < jobs.length) runNext();
+        }
+      }
+
+      const starters = Math.min(CONCURRENCY, jobs.length);
+      for (let i=0; i<starters; i++) runNext();
+      // Wait until all jobs drained
+      while ((idx < jobs.length || inFlight > 0) && !signal.aborted) {
+        await sleep(120);
+      }
+
+      if (!signal.aborted) {
+        $("#exportBtn").disabled = false;
+        $("#exportBtn").onclick = () => exportJSON(allMatches);
+      }
+
+    } catch (err) {
+      addErrorCard(err.message || String(err));
+    } finally {
+      $("#startBtn").disabled = false; $("#stopBtn").disabled = true;
+    }
+  }
+
+  function stopScan(){
+    if (abortController) abortController.abort();
+  }
+
+  function addMatchCard(m){
+    const el = document.createElement('div');
+    el.className = 'match';
+    const sevClass = m.severity === 'critical' ? 'crit' : (m.severity === 'high' ? 'warn' : '');
+    el.innerHTML = `
+      <div class="hdr">
+        <span class="badge ${sevClass}">${m.severity || 'medium'}</span>
+        <span class="badge">${escapeHtml(m.pattern)}</span>
+        <a class="badge" href="${m.html_url}" target="_blank" rel="noopener">${escapeHtml(m.repo)} → ${escapeHtml(m.path)} :${m.line}</a>
+      </div>
+      <pre><code>${highlightSnippet(m.snippet, m.match)}</code></pre>
+    `;
+    $("#results").prepend(el);
+  }
+
+  function addErrorCard(message){
+    const el = document.createElement('div');
+    el.className = 'match';
+    el.innerHTML = `<div class="hdr"><span class="badge crit">error</span><span>${escapeHtml(message)}</span></div>`;
+    $("#results").prepend(el);
+  }
+
+  function exportJSON(matches){
+    const blob = new Blob([JSON.stringify({ generatedAt: new Date().toISOString(), matches }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `github-secret-scan-${Date.now()}.json`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+  }
+
+  function highlightSnippet(snippet, match){
+    const safe = escapeHtml(snippet);
+    const m = escapeHtml(match);
+    // simple highlight: replace first occurrence
+    return safe.replace(m, `<mark>${m}</mark>`);
+  }
+
+  function resetDefaults(){
+    $("#patterns").value = JSON.stringify(DEFAULT_PATTERNS, null, 2);
+  }
+
+  // Wire up UI
+  $("#resetPatterns").onclick = resetDefaults;
+  $("#startBtn").onclick = (e)=>{ e.preventDefault(); startScan(); };
+  $("#stopBtn").onclick = (e)=>{ e.preventDefault(); stopScan(); };
+  resetDefaults();
+
+  </script>
+</body>
+</html>
