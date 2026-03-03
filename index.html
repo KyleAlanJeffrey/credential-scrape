@@ -3,301 +3,899 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GitHub Secret Scanner — Your Repos Only (Local)</title>
+  <title>Secret Scanner</title>
   <style>
-    :root { --bg:#0b1320; --panel:#121a2a; --muted:#90a4c4; --text:#e6edf3; --accent:#7aa2ff; --danger:#ff6b6b; }
-    html,body{ height:100%; }
-    body{ margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:linear-gradient(180deg,var(--bg),#0f172a 70%); color:var(--text);} 
-    header{ padding:24px 16px 8px; text-align:center; }
-    header h1{ margin:0 0 6px; }
-    header p{ margin:0; color:var(--muted); }
-    .container{ max-width:1100px; margin:18px auto 64px; padding:0 16px; }
-    .panel{ background:var(--panel); border:1px solid rgba(255,255,255,0.06); border-radius:14px; padding:16px; box-shadow:0 8px 30px rgba(0,0,0,0.35); }
-    .grid{ display:grid; gap:12px; }
-    @media(min-width: 980px){ .grid-cols-2{ grid-template-columns: 1.4fr 1fr; } }
-    label{ display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
-    input[type=text],input[type=password],textarea{ width:100%; background:#0f1627; color:var(--text); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:10px 12px; box-sizing:border-box; outline:none; }
-    .row{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
-    .row>*{ flex:1 1 200px; }
-    .btn{ background:#19233a; color:var(--text); border:1px solid rgba(255,255,255,0.08); padding:10px 14px; border-radius:10px; cursor:pointer; font-weight:600; }
-    .btn.primary{ background:var(--accent); color:#0b1020; border-color:transparent; }
-    .btn.danger{ background:var(--danger); color:#0b1020; border-color:transparent; }
-    .btn:disabled{ opacity:.55; cursor:not-allowed; }
-    .help{ color:var(--muted); font-size:13px; }
-    .status{ display:grid; grid-template-columns: repeat(4, minmax(120px,1fr)); gap:10px; margin-top:10px; }
-    .stat{ background:#0e1526; border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px; }
-    .stat .label{ color:var(--muted); font-size:12px; }
-    .stat .val{ font-size:18px; font-weight:700; }
-    .progressbar{ height:10px; background:rgba(255,255,255,0.07); border-radius:999px; overflow:hidden; }
-    .progressbar>div{ height:100%; width:0%; background:linear-gradient(90deg,var(--accent),#76e3ff); transition:width .2s ease; }
-    .results{ margin-top:18px; }
-    .match{ background:#0e1526; border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:12px; margin-bottom:12px; }
-    .match .hdr{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-    .badge{ font-size:12px; padding:2px 8px; border-radius:999px; background:#1b2642; border:1px solid rgba(255,255,255,0.08); color:#b9c7f6; }
-    .badge.warn{ background:#3b2c14; color:#ffd591; }
-    .badge.crit{ background:#3b1919; color:#ffb3b3; }
-    pre{ white-space:pre-wrap; background:#0b1020; border-radius:10px; padding:10px; border:1px solid rgba(255,255,255,0.06); }
-    .footer-note{ margin-top:12px; color:var(--muted); font-size:12px; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #020810;
+      --surface: #091525;
+      --border: rgba(90, 145, 255, 0.1);
+      --muted: #3f5878;
+      --dim: #6d90b8;
+      --text: #dceeff;
+      --accent: #4d8bfb;
+      --accent-glow: rgba(77, 139, 251, 0.22);
+      --danger: #fc8095;
+      --warn-bg: rgba(251, 191, 36, 0.07);
+      --warn-border: rgba(251, 191, 36, 0.22);
+      --warn-text: #fcd34d;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(rgba(80, 135, 255, 0.07) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px;
+      height: 300px;
+      background: radial-gradient(ellipse, rgba(77, 139, 251, 0.12) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+      transition: opacity 1s ease;
+    }
+
+    body.scanned::after { opacity: 0; }
+
+    .page { position: relative; z-index: 1; }
+
+    /* ── Hero ── */
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: calc(50vh - 130px) 20px 40px;
+      transition: padding-top 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body.scanned .hero { padding-top: 44px; }
+
+    .logo {
+      font-size: 40px;
+      font-weight: 800;
+      letter-spacing: -1.8px;
+      background: linear-gradient(140deg, #dceeff 20%, #8ab4f8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 10px;
+      user-select: none;
+      transition: font-size 0.7s cubic-bezier(0.4, 0, 0.2, 1),
+                  letter-spacing 0.7s cubic-bezier(0.4, 0, 0.2, 1),
+                  margin-bottom 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body.scanned .logo {
+      font-size: 17px;
+      letter-spacing: -0.3px;
+      margin-bottom: 22px;
+    }
+
+    .tagline {
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 36px;
+      max-height: 28px;
+      overflow: hidden;
+      transition: opacity 0.35s ease, max-height 0.5s ease, margin-bottom 0.5s ease;
+    }
+
+    body.scanned .tagline {
+      opacity: 0;
+      max-height: 0;
+      margin-bottom: 0;
+    }
+
+    .search-box {
+      width: 100%;
+      max-width: 500px;
+      transition: max-width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body.scanned .search-box { max-width: 680px; }
+
+    .search-row {
+      display: flex;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 7px 7px 7px 20px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .search-row:focus-within {
+      border-color: rgba(77, 139, 251, 0.4);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    #username {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 15px;
+      min-width: 0;
+    }
+
+    #username::placeholder { color: var(--muted); }
+
+    /* Unified action button — scan or stop */
+    #actionBtn {
+      position: relative;
+      overflow: hidden;
+      border: none;
+      border-radius: 11px;
+      padding: 10px 22px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.1px;
+      white-space: nowrap;
+      transition: background 0.2s, color 0.2s, transform 0.1s;
+      background: var(--accent);
+      color: #fff;
+    }
+
+    #actionBtn:active { transform: scale(0.97); }
+    #actionBtn:hover { filter: brightness(1.12); }
+
+    #actionBtn.stop-mode {
+      background: rgba(244, 63, 94, 0.15);
+      color: var(--danger);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    /* Sweep shimmer on button while scanning (before stop-mode kicks in) */
+    #actionBtn.stop-mode::after {
+      content: none;
+    }
+
+    .token-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+      width: 100%;
+      max-width: 500px;
+      transition: max-width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    body.scanned .token-row { max-width: 680px; }
+
+    .token-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      white-space: nowrap;
+    }
+
+    #token {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      padding: 8px 13px;
+      color: var(--dim);
+      font-size: 12px;
+      outline: none;
+      min-width: 0;
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    #token:focus { border-color: rgba(77, 139, 251, 0.35); color: var(--text); }
+    #token::placeholder { color: var(--muted); }
+
+    /* ── Results area ── */
+    .results-area {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 0 20px 80px;
+      opacity: 0;
+      transform: translateY(18px);
+      pointer-events: none;
+      transition: opacity 0.6s 0.25s ease, transform 0.6s 0.25s ease;
+    }
+
+    body.scanned .results-area {
+      opacity: 1;
+      transform: none;
+      pointer-events: auto;
+    }
+
+    /* ── Progress ── */
+    .progress-wrap { margin-bottom: 20px; }
+
+    .progress-track {
+      height: 2px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      position: relative;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), #a78bfa);
+      border-radius: 99px;
+      position: relative;
+      transition: width 0.25s ease;
+    }
+
+    /* Beam sweeping over the fill while scanning */
+    .progress-fill.active::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      width: 80px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+      animation: barBeam 1.6s ease-in-out infinite;
+    }
+
+    @keyframes barBeam {
+      from { transform: translateX(-80px); }
+      to   { transform: translateX(calc(100vw)); }
+    }
+
+    /* Indeterminate shimmer when width is 0 but we're loading */
+    .progress-track.indeterminate::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(77, 139, 251, 0.4) 40%, rgba(167,139,250,0.4) 60%, transparent 100%);
+      animation: indeterminate 1.8s ease-in-out infinite;
+    }
+
+    @keyframes indeterminate {
+      from { transform: translateX(-100%); }
+      to   { transform: translateX(200%); }
+    }
+
+    .stats {
+      display: flex;
+      gap: 24px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .stats strong { color: var(--text); font-weight: 600; }
+
+    /* ── Scan status line ── */
+    .scan-status {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 11px;
+      font-family: ui-monospace, 'SF Mono', monospace;
+      color: var(--muted);
+      overflow: hidden;
+    }
+
+    .scan-status.visible { display: flex; }
+
+    .pulse-dot {
+      flex-shrink: 0;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulseDot 1.4s ease-in-out infinite;
+    }
+
+    .pulse-dot.rate-limited {
+      background: var(--warn-text);
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(77,139,251,0.4); }
+      50%       { opacity: 0.5; transform: scale(0.7); box-shadow: 0 0 0 4px rgba(77,139,251,0); }
+    }
+
+    #scanStatusText {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 600px;
+      transition: color 0.3s;
+    }
+
+    /* Repo name highlight in status */
+    #scanStatusText .repo-name { color: var(--dim); }
+    #scanStatusText .file-path { color: var(--muted); }
+
+    /* ── Rate limit banner ── */
+    .rate-banner {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-radius: 11px;
+      padding: 10px 14px;
+      font-size: 12px;
+      color: var(--warn-text);
+      margin-bottom: 12px;
+      animation: cardIn 0.3s ease both;
+    }
+
+    .rate-banner.visible { display: flex; }
+
+    .rate-banner-icon { font-size: 14px; flex-shrink: 0; }
+
+    .rate-banner-msg { flex: 1; line-height: 1.5; }
+    .rate-banner-msg strong { color: #fde68a; }
+
+    /* ── Results header ── */
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      min-height: 28px;
+    }
+
+    .findings-count {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--dim);
+    }
+
+    .export-btn {
+      display: none;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .export-btn.visible { display: block; }
+    .export-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.14); }
+
+    /* ── Cards ── */
+    .match {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+      animation: cardIn 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    .match-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 99px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: 1px solid transparent;
+    }
+
+    .badge.critical { background: rgba(244, 63, 94, 0.15);  color: #fc8095; border-color: rgba(244,63,94,0.28); }
+    .badge.high     { background: rgba(251, 191, 36, 0.12);  color: #fcd34d; border-color: rgba(251,191,36,0.26); }
+    .badge.medium   { background: rgba(165, 180, 252, 0.1);  color: #b4bcff; border-color: rgba(165,180,252,0.22); }
+
+    .match-pattern { font-size: 13px; color: var(--text); font-weight: 500; }
+
+    .match-link {
+      font-size: 11px;
+      color: var(--muted);
+      text-decoration: none;
+      margin-left: auto;
+      font-family: ui-monospace, 'SF Mono', monospace;
+      transition: color 0.15s;
+    }
+
+    .match-link:hover { color: var(--accent); }
+
+    pre {
+      margin: 0;
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 9px;
+      padding: 10px 14px;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #5a7fa8;
+      font-family: ui-monospace, 'SF Mono', monospace;
+      line-height: 1.6;
+    }
+
+    mark {
+      background: rgba(252, 211, 77, 0.2);
+      color: #fcd34d;
+      border-radius: 3px;
+      padding: 1px 3px;
+    }
+
+    .info-card {
+      background: rgba(77, 139, 251, 0.06);
+      border: 1px solid rgba(77, 139, 251, 0.16);
+      border-radius: 11px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--dim);
+      margin-bottom: 10px;
+      animation: cardIn 0.3s ease both;
+    }
+
+    .error-card {
+      background: rgba(244, 63, 94, 0.06);
+      border: 1px solid rgba(244, 63, 94, 0.18);
+      border-radius: 11px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #fc8095;
+      margin-bottom: 10px;
+      animation: cardIn 0.3s ease both;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: var(--muted);
+      padding: 64px 0;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>GitHub Secret Scanner</h1>
-    <p>Local, browser-only utility to scan <strong>your own repositories</strong> for accidental credentials. Token optional (public-only mode).</p>
-  </header>
+<div class="page">
 
-  <div class="container grid grid-cols-2">
-    <section class="panel">
-      <h2>Setup</h2>
-      <div class="grid">
-        <div>
-          <label>GitHub Personal Access Token (optional; required for private repos & higher limits)</label>
-          <input id="token" type="password" autocomplete="off" placeholder="ghp_... or github_pat_...">
-          <div class="help">With token: scans private + public, higher rate limits. Without token: scans public repos only (rate limit ~60/hr).</div>
-        </div>
-        <div class="row">
-          <div>
-            <label>Target GitHub username</label>
-            <input id="username" type="text" placeholder="your-github-handle" required>
-          </div>
-          <div>
-            <label>Max file size (KB)</label>
-            <input id="maxSizeKB" type="text" value="512">
-          </div>
-        </div>
-        <div class="row">
-          <label style="flex:0 0 auto"><input id="includePrivate" type="checkbox" checked> Include private repos (requires token)</label>
-          <label style="flex:0 0 auto"><input id="includeForks" type="checkbox"> Include forks</label>
-          <label style="flex:0 0 auto"><input id="includeArchived" type="checkbox"> Include archived</label>
-          <label style="flex:0 0 auto"><input id="respectGitignore" type="checkbox" checked> Skip common build/vendor dirs</label>
-        </div>
-        <div class="row">
-          <label style="flex:0 0 auto"><input id="scanHistory" type="checkbox"> Scan commit history (default branch)</label>
-          <div style="flex:0 0 220px">
-            <label>Max commits to traverse</label>
-            <input id="maxCommits" type="text" value="200">
-          </div>
-        </div>
-        <div class="row">
-          <button id="startBtn" class="btn primary">Start scan</button>
-          <button id="stopBtn" class="btn danger" disabled>Stop</button>
-          <button id="exportBtn" class="btn" disabled>Export JSON</button>
-        </div>
-      </div>
+  <div class="hero" id="hero">
+    <h1 class="logo">Secret Scanner</h1>
+    <p class="tagline">Find leaked credentials across GitHub repositories.</p>
 
-      <div style="margin-top:14px">
-        <div class="progressbar"><div id="bar"></div></div>
-        <div class="status" style="margin-top:10px">
-          <div class="stat"><div class="label">Repos</div><div class="val" id="stat-repos">0</div></div>
-          <div class="stat"><div class="label">Files scanned</div><div class="val" id="stat-files">0</div></div>
-          <div class="stat"><div class="label">Matches</div><div class="val" id="stat-matches">0</div></div>
-          <div class="stat"><div class="label">Rate limit</div><div class="val" id="stat-rate">—</div></div>
-        </div>
+    <div class="search-box">
+      <div class="search-row">
+        <input id="username" type="text" placeholder="GitHub username" autocomplete="off" spellcheck="false" />
+        <button id="actionBtn">Scan</button>
       </div>
-    </section>
+    </div>
 
-    <section class="panel">
-      <h2>Patterns</h2>
-      <p class="help">Edit as needed. JavaScript RegExp syntax. Each entry is <code>{ name, regex, flags, severity }</code>.</p>
-      <textarea id="patterns" rows="22"></textarea>
-      <div class="row" style="margin-top:8px">
-        <button id="resetPatterns" class="btn">Reset defaults</button>
-      </div>
-      <p class="footer-note">Tip: Keep the set small to reduce false positives and API usage. Scans text files only; skips large/binary paths.</p>
-    </section>
+    <div class="token-row">
+      <span class="token-label">Token</span>
+      <input id="token" type="password" placeholder="ghp_... — optional, for private repos &amp; higher rate limits" autocomplete="off" />
+    </div>
   </div>
 
-  <div class="container">
-    <section class="panel">
-      <h2>Results</h2>
-      <div id="results" class="results"></div>
-    </section>
+  <div class="results-area">
+    <div class="progress-wrap">
+      <div class="progress-track" id="progressTrack">
+        <div class="progress-fill" id="bar"></div>
+      </div>
+      <div class="stats">
+        Repos: <strong id="stat-repos">0</strong>
+        &nbsp;&nbsp;Files: <strong id="stat-files">0</strong>
+        &nbsp;&nbsp;Findings: <strong id="stat-matches">0</strong>
+      </div>
+      <div class="scan-status" id="scanStatus">
+        <span class="pulse-dot" id="pulseDot"></span>
+        <span id="scanStatusText"></span>
+      </div>
+    </div>
+
+    <div class="rate-banner" id="rateBanner">
+      <span class="rate-banner-icon">⏳</span>
+      <span class="rate-banner-msg" id="rateBannerMsg"></span>
+    </div>
+
+    <div class="results-header">
+      <div class="findings-count" id="findingsCount"></div>
+      <button class="export-btn" id="exportBtn">Export JSON</button>
+    </div>
+    <div id="results"></div>
   </div>
 
-  <script>
-    // ===== Helpers =====
-    const $ = (sel) => document.querySelector(sel);
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-    const textDecoder = new TextDecoder("utf-8", { fatal:false });
-    function human(n){ return Number(n||0).toLocaleString(); }
-    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
-    function looksBinary(uint8){ const len=Math.min(uint8.length,2048); let zeros=0,ctl=0; for(let i=0;i<len;i++){const b=uint8[i]; if(b===0) zeros++; if(b<7 || (b>13 && b<32)) ctl++; } return zeros>0 || ctl/len>0.3; }
+</div>
+<script>
+  const $ = (s) => document.querySelector(s);
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const dec = new TextDecoder('utf-8', { fatal: false });
 
-    const DEFAULT_PATTERNS = [
-      { name: "AWS Access Key ID", regex: "AKIA[0-9A-Z]{16}", flags: "g", severity: "high" },
-      { name: "AWS Secret Access Key", regex: "aws(.{0,20})?(secret|access).{0,20}[\"'][0-9a-zA-Z/+]{40}[\"']", flags: "gi", severity: "high" },
-      { name: "GitHub Token (classic)", regex: "(?:ghp|gho|ghu|ghs|ghr)_[0-9A-Za-z]{36}", flags: "g", severity: "high" },
-      { name: "GitHub Token (fine-grained)", regex: "github_pat_[0-9A-Za-z_]{50,255}", flags: "g", severity: "high" },
-      { name: "Google API Key", regex: "AIza[0-9A-Za-z_\\-]{35}", flags: "g", severity: "high" },
-      { name: "Slack Token", regex: "xox[baprs]-[0-9A-Za-z-]{10,48}", flags: "g", severity: "high" },
-      { name: "Slack Webhook", regex: "https://hooks\\.slack\\.com/services/[A-Za-z0-9/]{20,}", flags: "g", severity: "high" },
-      { name: "Private Key Header", regex: "-----BEGIN (?:EC|RSA|OPENSSH|DSA) PRIVATE KEY-----", flags: "g", severity: "critical" },
-      { name: "Generic Password Assignments", regex: "\\b(password|passwd|pwd|secret|token)\\b\\s*[:=]\\s*[\"'][^\"'\\n]{6,}[\"']", flags: "gi", severity: "medium" },
-      { name: "JWT", regex: "eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}", flags: "g", severity: "medium" }
-    ];
+  function human(n) { return Number(n || 0).toLocaleString(); }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, c =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function looksBinary(u8) {
+    const len = Math.min(u8.length, 2048); let z = 0, c = 0;
+    for (let i = 0; i < len; i++) { const b = u8[i]; if (b === 0) z++; if (b < 7 || (b > 13 && b < 32)) c++; }
+    return z > 0 || c / len > 0.3;
+  }
 
-    function compilePatterns(list){ return list.map(p => ({...p, re:new RegExp(p.regex, p.flags||'g')})); }
-    function matchFile(content, compiled){
-      const lines = content.split(/\r?\n/); const out = [];
-      for(let i=0;i<lines.length;i++){
-        const line = lines[i];
-        for(const p of compiled){ p.re.lastIndex=0; let m; while((m=p.re.exec(line))!==null){ const start=Math.max(0,m.index-60); const end=Math.min(line.length, m.index+(m[0]?.length||0)+60); out.push({ pattern:p.name, severity:p.severity||'medium', line:i+1, match:m[0], snippet: line.slice(start,end)}); if(!p.re.global) break; } }
+  const PATTERNS = [
+    { name: 'AWS Access Key ID',          regex: 'AKIA[0-9A-Z]{16}',                                                            flags: 'g',  severity: 'high'     },
+    { name: 'AWS Secret Access Key',      regex: 'aws(.{0,20})?(secret|access).{0,20}["\'][0-9a-zA-Z/+]{40}["\']',             flags: 'gi', severity: 'high'     },
+    { name: 'GitHub Token (classic)',     regex: '(?:ghp|gho|ghu|ghs|ghr)_[0-9A-Za-z]{36}',                                    flags: 'g',  severity: 'high'     },
+    { name: 'GitHub Token (fine-grained)',regex: 'github_pat_[0-9A-Za-z_]{50,255}',                                            flags: 'g',  severity: 'high'     },
+    { name: 'Google API Key',             regex: 'AIza[0-9A-Za-z_\\-]{35}',                                                    flags: 'g',  severity: 'high'     },
+    { name: 'Slack Token',                regex: 'xox[baprs]-[0-9A-Za-z-]{10,48}',                                             flags: 'g',  severity: 'high'     },
+    { name: 'Slack Webhook',              regex: 'https://hooks\\.slack\\.com/services/[A-Za-z0-9/]{20,}',                     flags: 'g',  severity: 'high'     },
+    { name: 'Private Key',                regex: '-----BEGIN (?:EC|RSA|OPENSSH|DSA) PRIVATE KEY-----',                         flags: 'g',  severity: 'critical' },
+    { name: 'Generic Secret Assignment',  regex: '\\b(password|passwd|pwd|secret|token)\\b\\s*[:=]\\s*["\'][^"\'\\n]{6,}["\']',flags: 'gi', severity: 'medium'   },
+    { name: 'JWT',                        regex: 'eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]{10,}',          flags: 'g',  severity: 'medium'   },
+  ];
+
+  const compiled = PATTERNS.map(p => ({ ...p, re: new RegExp(p.regex, p.flags) }));
+
+  function matchFile(content) {
+    const lines = content.split(/\r?\n/); const out = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      for (const p of compiled) {
+        p.re.lastIndex = 0; let m;
+        while ((m = p.re.exec(line)) !== null) {
+          const s = Math.max(0, m.index - 60), e = Math.min(line.length, m.index + (m[0]?.length || 0) + 60);
+          out.push({ pattern: p.name, severity: p.severity, line: i + 1, match: m[0], snippet: line.slice(s, e) });
+          if (!p.re.global) break;
+        }
+      }
+    }
+    return out;
+  }
+
+  // ── UI helpers ──────────────────────────────────────────────────────────────
+
+  let rateLimitInterval = null;
+
+  function setStatus(html, rateLimited = false) {
+    const el = $('#scanStatus');
+    el.classList.add('visible');
+    $('#scanStatusText').innerHTML = html;
+    $('#pulseDot').className = 'pulse-dot' + (rateLimited ? ' rate-limited' : '');
+  }
+
+  function clearStatus() {
+    $('#scanStatus').classList.remove('visible');
+  }
+
+  function showRateBanner(msg) {
+    const b = $('#rateBanner');
+    $('#rateBannerMsg').innerHTML = msg;
+    b.classList.add('visible');
+  }
+
+  function hideRateBanner() {
+    $('#rateBanner').classList.remove('visible');
+    if (rateLimitInterval) { clearInterval(rateLimitInterval); rateLimitInterval = null; }
+  }
+
+  function setScanning(active) {
+    const btn = $('#actionBtn');
+    if (active) {
+      btn.textContent = 'Stop';
+      btn.classList.add('stop-mode');
+    } else {
+      btn.textContent = 'Scan';
+      btn.classList.remove('stop-mode');
+    }
+    $('#progressTrack').classList.toggle('indeterminate', active && $('#bar').style.width === '0%');
+    $('#bar').classList.toggle('active', active);
+  }
+
+  // ── GitHub client ────────────────────────────────────────────────────────────
+
+  function githubClient(token, signal) {
+    const base = 'https://api.github.com';
+    const headers = { 'Accept': 'application/vnd.github+json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) };
+    let q = Promise.resolve();
+    const delay = token ? 80 : 150;
+
+    async function request(path) {
+      for (;;) {
+        await (q = q.then(() => sleep(delay)));
+        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+
+        const res = await fetch(base + path, { headers, signal });
+
+        // Rate limit handling — auto wait & retry
+        if (res.status === 403 || res.status === 429) {
+          let body = {};
+          try { body = await res.json(); } catch (_) {}
+          const msg = (body.message || '').toLowerCase();
+          if (msg.includes('rate limit') || res.status === 429) {
+            const resetHeader = res.headers.get('x-ratelimit-reset');
+            const resetAt = resetHeader ? parseInt(resetHeader) * 1000 : Date.now() + 65_000;
+            await waitForRateLimit(resetAt, token);
+            continue; // retry
+          }
+          const t = JSON.stringify(body);
+          throw new Error(`GitHub 403: ${t.slice(0, 200)}`);
+        }
+
+        if (!res.ok) {
+          let t = '';
+          try { t = await res.text(); } catch (_) {}
+          throw new Error(`GitHub ${res.status}: ${t.slice(0, 200)}`);
+        }
+
+        return { json: await res.json(), headers: res.headers };
+      }
+    }
+
+    async function paged(path) {
+      let url = path, out = [];
+      while (url) {
+        const r = await request(url); out = out.concat(r.json);
+        const lnk = r.headers.get('link');
+        url = (lnk && lnk.includes('rel="next"'))
+          ? (lnk.match(/<([^>]+)>; rel="next"/) || [])[1]?.replace(base, '') ?? null
+          : null;
       }
       return out;
     }
 
-    function renderRateLimit(headers){
-      const remain = headers.get('x-ratelimit-remaining');
-      const limit = headers.get('x-ratelimit-limit');
-      const reset = headers.get('x-ratelimit-reset');
-      let extra=''; if(reset){ const d=new Date(parseInt(reset,10)*1000); extra = ` (resets ${d.toLocaleTimeString()})`; }
-      $("#stat-rate").textContent = (remain && limit) ? `${remain}/${limit}${extra}` : '—';
-    }
+    return { request, paged };
+  }
 
-    // ===== GitHub API client =====
-    function githubClient(token, signal){
-      const base='https://api.github.com';
-      const headersBase = { 'Accept':'application/vnd.github+json', ...(token?{'Authorization':`Bearer ${token}`}:{}) };
-      let queue = Promise.resolve();
-      const delayMs = token ? 80 : 150; // go slower without token
-      async function request(path, init={}){
-        await (queue = queue.then(()=>sleep(delayMs)));
-        const res = await fetch(base+path, { ...init, headers:{...headersBase, ...(init.headers||{})}, signal });
-        renderRateLimit(res.headers);
-        if(!res.ok){ const text = await res.text(); throw new Error(`GitHub API ${res.status}: ${text.slice(0,200)}`); }
-        const json = await res.json();
-        return { json, headers:res.headers };
+  async function waitForRateLimit(resetAt, hasToken) {
+    const buffer = 3000;
+    const waitUntil = resetAt + buffer;
+    const resetTime = new Date(resetAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    setStatus('Rate limited — waiting to resume…', true);
+
+    if (rateLimitInterval) clearInterval(rateLimitInterval);
+    rateLimitInterval = setInterval(() => {
+      const secs = Math.max(0, Math.ceil((waitUntil - Date.now()) / 1000));
+      const tip = hasToken ? '' : ' Add a token for 5000 req/hr instead of 60.';
+      showRateBanner(
+        `<strong>Rate limit reached.</strong> Resuming at ${resetTime} — ${secs}s remaining.${tip}`
+      );
+      if (secs <= 0) { clearInterval(rateLimitInterval); rateLimitInterval = null; }
+    }, 500);
+
+    // First render immediately
+    const secs0 = Math.max(0, Math.ceil((waitUntil - Date.now()) / 1000));
+    const tip0 = hasToken ? '' : ' Add a token for 5000 req/hr instead of 60.';
+    showRateBanner(`<strong>Rate limit reached.</strong> Resuming at ${resetTime} — ${secs0}s remaining.${tip0}`);
+
+    const remaining = waitUntil - Date.now();
+    if (remaining > 0) await sleep(remaining);
+    hideRateBanner();
+  }
+
+  // ── Scan orchestration ───────────────────────────────────────────────────────
+
+  let abort = null;
+  let isScanning = false;
+
+  async function startScan() {
+    const token = $('#token').value.trim();
+    const username = $('#username').value.trim();
+    if (!username) { $('#username').focus(); return; }
+
+    isScanning = true;
+    document.body.classList.add('scanned');
+    setScanning(true);
+
+    $('#results').innerHTML = '';
+    $('#stat-repos').textContent = '0';
+    $('#stat-files').textContent = '0';
+    $('#stat-matches').textContent = '0';
+    $('#bar').style.width = '0%';
+    $('#findingsCount').textContent = '';
+    $('#exportBtn').classList.remove('visible');
+    hideRateBanner();
+
+    abort = new AbortController();
+    const { signal } = abort;
+
+    const client = githubClient(token, signal);
+    const allMatches = [];
+
+    try {
+      setStatus('Connecting to GitHub…');
+
+      let login = username;
+      if (token) {
+        const { json: me } = await client.request('/user');
+        login = me.login;
+        if (login.toLowerCase() !== username.toLowerCase())
+          throw new Error(`Token belongs to "${login}" but you entered "${username}".`);
+      } else {
+        addInfo('No token — scanning public repos only (rate limit ~60 req/hr). Add a token above for private repos and higher limits.');
       }
-      async function paged(path){
-        let url=path, out=[], headers;
-        while(url){
-          const res = await request(url); headers=res.headers; out=out.concat(res.json);
-          const link=headers.get('link');
-          if(link && link.includes('rel="next"')){ const m=link.match(/<([^>]+)>; rel="next"/); url = m? m[1].replace(base,''): null; } else url=null;
-        }
-        return { items: out, headers };
+
+      setStatus('Fetching repository list…');
+
+      const repos = token
+        ? (await client.paged(`/user/repos?per_page=100&affiliation=owner&visibility=all&sort=updated`))
+            .filter(r => r.owner?.login?.toLowerCase() === login.toLowerCase() && !r.fork && !r.archived)
+        : (await client.paged(`/users/${encodeURIComponent(username)}/repos?type=owner&per_page=100&sort=updated`))
+            .filter(r => !r.fork && !r.archived);
+
+      $('#stat-repos').textContent = human(repos.length);
+      if (!repos.length) {
+        setStatus('No repositories found.');
+        return;
       }
-      return { request, paged };
-    }
 
-    // ===== UI state =====
-    let abortController = null;
+      const SKIP = ['node_modules/', 'vendor/', 'dist/', 'build/', 'target/', '.next/', '.git/', '__pycache__/', 'venv/', '.venv/'];
+      const MAX = 512 * 1024;
+      const jobs = []; // { label, fn }
 
-    async function startScan(){
-      const token = $("#token").value.trim(); // optional
-      const username = $("#username").value.trim();
-      const maxSizeKB = Math.max(1, parseInt($("#maxSizeKB").value,10) || 512);
-      const includePrivate = $("#includePrivate").checked && !!token; // needs token
-      const includeForks = $("#includeForks").checked;
-      const includeArchived = $("#includeArchived").checked;
-      const respectGitignore = $("#respectGitignore").checked;
-      const scanHistory = $("#scanHistory").checked;
-      const maxCommits = Math.max(1, parseInt($("#maxCommits").value,10) || 200);
+      for (const repo of repos) {
+        if (signal.aborted) break;
+        const branch = repo.default_branch || 'main';
+        setStatus(`<span class="repo-name">${esc(repo.full_name)}</span> — reading tree…`);
 
-      if(!username){ alert('Username is required.'); return; }
-      if(!token && includePrivate){ alert('Private repo scanning requires a token.'); return; }
-
-      let patterns;
-      try{ patterns = JSON.parse($("#patterns").value); if(!Array.isArray(patterns)) throw new Error('Patterns must be an array'); }
-      catch(e){ alert('Patterns JSON is invalid. '+e.message); return; }
-      const compiled = compilePatterns(patterns);
-
-      // reset UI
-      $("#results").innerHTML=''; $("#stat-repos").textContent='0'; $("#stat-files").textContent='0'; $("#stat-matches").textContent='0'; $("#bar").style.width='0%';
-      abortController = new AbortController(); const signal = abortController.signal; $("#startBtn").disabled=true; $("#stopBtn").disabled=false; $("#exportBtn").disabled=true;
-
-      const client = githubClient(token, signal);
-      try{
-        // Identity guard: if token present, enforce token owner === username
-        let login = username;
-        if(token){ const me = await client.request('/user'); login = me.json.login; if(!login || login.toLowerCase()!==username.toLowerCase()){ throw new Error(`For safety, token user is "${login}", but target username is "${username}".`);} }
-        else{ addInfoCard('Public-only mode (no token). Private repos are skipped; rate limit ~60/hour. Please scan only repos you own or have permission to audit.'); }
-
-        // Load repos
-        let repos=[];
-        if(token){
-          const vis = includePrivate ? 'all' : 'public';
-          const { items } = await client.paged(`/user/repos?per_page=100&affiliation=owner&visibility=${vis}&sort=updated`);
-          repos = items.filter(r => r.owner?.login?.toLowerCase() === login.toLowerCase());
-        } else {
-          const { items } = await client.paged(`/users/${encodeURIComponent(username)}/repos?type=owner&per_page=100&sort=updated`);
-          repos = items;
-        }
-        const filtered = repos.filter(r => (includeForks || !r.fork) && (includeArchived || !r.archived));
-        $("#stat-repos").textContent = human(filtered.length);
-
-        const DEFAULT_IGNORE_DIRS = ["node_modules/","vendor/","dist/","build/","target/",".next/",".git/",".cache/","__pycache__/","venv/",".venv/",".gradle/",".idea/"];
-        const IGNORE_DIRS = respectGitignore ? DEFAULT_IGNORE_DIRS : [];
-
-        const jobs = []; let totalFiles=0;
-
-        if(!scanHistory){
-          // Current HEAD only
-          for(const repo of filtered){
-            const branch = repo.default_branch || 'main';
-            const { json: treeRes } = await client.request(`/repos/${repo.owner.login}/${repo.name}/git/trees/${encodeURIComponent(branch)}?recursive=1`);
-            const tree = treeRes.tree || [];
-            if(treeRes.truncated) addInfoCard(`${repo.full_name}: tree was truncated by GitHub API; scan may be partial.`);
-            const files = tree.filter(e => e.type==='blob');
-            for(const f of files){ if(IGNORE_DIRS.some(d => f.path.startsWith(d))) continue; if(typeof f.size==='number' && f.size > (maxSizeKB*1024)) continue; totalFiles++; jobs.push(() => scanBlobByPath(client, repo, branch, f.path, compiled)); }
-          }
-        } else {
-          // History scan: traverse commits on default branch; dedupe blobs
-          const scannedBlobShas = new Set();
-          for(const repo of filtered){
-            const branch = repo.default_branch || 'main';
-            const { items: commits } = await client.paged(`/repos/${repo.owner.login}/${repo.name}/commits?sha=${encodeURIComponent(branch)}&per_page=100`);
-            const subset = commits.slice(0, maxCommits);
-            for(const c of subset){ const treeSha = c.commit?.tree?.sha; if(!treeSha) continue; const { json: treeRes } = await client.request(`/repos/${repo.owner.login}/${repo.name}/git/trees/${treeSha}?recursive=1`); const tree = treeRes.tree || []; for(const e of tree){ if(e.type!== 'blob') continue; if(IGNORE_DIRS.some(d => e.path.startsWith(d))) continue; if(scannedBlobShas.has(e.sha)) continue; scannedBlobShas.add(e.sha); totalFiles++; jobs.push(() => scanBlobBySha(client, repo, branch, e, compiled, maxSizeKB)); } }
-          }
+        let tree;
+        try {
+          const { json } = await client.request(`/repos/${repo.owner.login}/${repo.name}/git/trees/${encodeURIComponent(branch)}?recursive=1`);
+          tree = json.tree || [];
+        } catch (e) {
+          if (e.name === 'AbortError') break;
+          if (e.message.includes('409')) continue; // empty repo
+          addError(`${repo.full_name}: ${e.message}`);
+          continue;
         }
 
-        // Process with limited concurrency
-        const CONCURRENCY = token ? 3 : 1;
-        let inFlight=0, idx=0, filesDone=0, allMatches=[];
-        async function runNext(){ if(signal.aborted) return; if(idx>=jobs.length) return; const i=idx++; inFlight++; try{ const res = await jobs[i](); filesDone++; $("#stat-files").textContent=human(filesDone); const pct = totalFiles? Math.round((filesDone/totalFiles)*100):0; $("#bar").style.width=`${pct}%`; if(res && res.length){ allMatches=allMatches.concat(res); $("#stat-matches").textContent=human(allMatches.length); for(const m of res) addMatchCard(m); } } catch(e){ addErrorCard(e.message);} finally{ inFlight--; if(idx<jobs.length) runNext(); } }
-        const starters = Math.min(CONCURRENCY, jobs.length); for(let i=0;i<starters;i++) runNext();
-        while((idx<jobs.length || inFlight>0) && !signal.aborted){ await sleep(120); }
-        if(!signal.aborted){ $("#exportBtn").disabled=false; $("#exportBtn").onclick = ()=> exportJSON(allMatches); }
-      } catch(err){ addErrorCard(err.message || String(err)); }
-      finally{ $("#startBtn").disabled=false; $("#stopBtn").disabled=true; }
+        for (const f of tree) {
+          if (f.type !== 'blob') continue;
+          if (SKIP.some(d => f.path.startsWith(d))) continue;
+          if (typeof f.size === 'number' && f.size > MAX) continue;
+          jobs.push({ repo, branch, path: f.path });
+        }
+      }
+
+      if (signal.aborted) return;
+
+      // Stop indeterminate, switch to real progress
+      $('#progressTrack').classList.remove('indeterminate');
+
+      const CONCURRENCY = token ? 3 : 1;
+      let inFlight = 0, idx = 0, done = 0;
+
+      async function next() {
+        if (signal.aborted || idx >= jobs.length) return;
+        const { repo, branch, path } = jobs[idx++];
+        inFlight++;
+
+        setStatus(`<span class="repo-name">${esc(repo.full_name)}</span> <span class="file-path">/ ${esc(path)}</span>`);
+
+        try {
+          const res = await scanFile(client, repo, branch, path);
+          done++;
+          const pct = Math.round(done / jobs.length * 100);
+          $('#stat-files').textContent = human(done);
+          $('#bar').style.width = `${pct}%`;
+          if (res?.length) {
+            allMatches.push(...res);
+            $('#stat-matches').textContent = human(allMatches.length);
+            res.forEach(addMatch);
+          }
+        } catch (e) {
+          if (e.name !== 'AbortError') addError(e.message);
+        } finally {
+          inFlight--;
+          next();
+        }
+      }
+
+      for (let i = 0; i < Math.min(CONCURRENCY, jobs.length); i++) next();
+      while ((idx < jobs.length || inFlight > 0) && !signal.aborted) await sleep(120);
+
+      if (!signal.aborted) {
+        clearStatus();
+        const n = allMatches.length;
+        $('#findingsCount').textContent = n ? `${n} finding${n !== 1 ? 's' : ''}` : '';
+        if (!n) $('#results').innerHTML = '<div class="empty-state">No secrets found.</div>';
+        if (n) { $('#exportBtn').classList.add('visible'); $('#exportBtn').onclick = () => exportJSON(allMatches); }
+      } else {
+        setStatus('Scan stopped.');
+      }
+    } catch (err) {
+      if (err.name !== 'AbortError') addError(err.message || String(err));
+      clearStatus();
+    } finally {
+      isScanning = false;
+      setScanning(false);
+      hideRateBanner();
     }
+  }
 
-    async function scanBlobByPath(client, repo, branch, path, compiled){
-      try{
-        const { json:file } = await client.request(`/repos/${repo.owner.login}/${repo.name}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`);
-        if(!file || file.type!=='file' || !file.content) return [];
-        const raw = atob(file.content.replace(/\n/g,'')); const uint8 = new Uint8Array(raw.length); for(let i=0;i<raw.length;i++) uint8[i]=raw.charCodeAt(i);
-        if(looksBinary(uint8)) return [];
-        const text = textDecoder.decode(uint8);
-        return matchFile(text, compiled).map(m => ({ repo:`${repo.owner.login}/${repo.name}`, branch, path, html_url:`https://github.com/${repo.owner.login}/${repo.name}/blob/${encodeURIComponent(branch)}/${path}#L${m.line}`, ...m }));
-      }catch(e){ addErrorCard(e.message); return []; }
-    }
+  function stopScan() {
+    if (abort) abort.abort();
+  }
 
-    async function scanBlobBySha(client, repo, branch, entry, compiled, maxSizeKB){
-      try{
-        const { json: blob } = await client.request(`/repos/${repo.owner.login}/${repo.name}/git/blobs/${entry.sha}`);
-        const size = blob.size || 0; if(size > (maxSizeKB*1024)) return [];
-        const raw = atob(blob.content.replace(/\n/g,'')); const uint8 = new Uint8Array(raw.length); for(let i=0;i<raw.length;i++) uint8[i]=raw.charCodeAt(i);
-        if(looksBinary(uint8)) return [];
-        const text = textDecoder.decode(uint8);
-        return matchFile(text, compiled).map(m => ({ repo:`${repo.owner.login}/${repo.name}`, branch, path: entry.path, html_url:`https://github.com/${repo.owner.login}/${repo.name}/blob/${encodeURIComponent(branch)}/${entry.path}#L${m.line}`, ...m }));
-      }catch(e){ addErrorCard(e.message); return []; }
-    }
+  async function scanFile(client, repo, branch, path) {
+    const { json: f } = await client.request(`/repos/${repo.owner.login}/${repo.name}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`);
+    if (!f || f.type !== 'file' || !f.content) return [];
+    const raw = atob(f.content.replace(/\n/g, ''));
+    const u8 = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) u8[i] = raw.charCodeAt(i);
+    if (looksBinary(u8)) return [];
+    return matchFile(dec.decode(u8)).map(m => ({
+      repo: `${repo.owner.login}/${repo.name}`, branch, path,
+      html_url: `https://github.com/${repo.owner.login}/${repo.name}/blob/${encodeURIComponent(branch)}/${path}#L${m.line}`,
+      ...m
+    }));
+  }
 
-    function stopScan(){ if(abortController) abortController.abort(); }
-    function addInfoCard(message){ const el=document.createElement('div'); el.className='match'; el.innerHTML = `<div class="hdr"><span class="badge">info</span><span>${escapeHtml(message)}</span></div>`; $("#results").prepend(el); }
-    function addMatchCard(m){ const el=document.createElement('div'); el.className='match'; const sev = m.severity==='critical'?'crit':(m.severity==='high'?'warn':''); el.innerHTML = `<div class="hdr"><span class="badge ${sev}">${m.severity||'medium'}</span><span class="badge">${escapeHtml(m.pattern)}</span><a class="badge" href="${m.html_url}" target="_blank" rel="noopener">${escapeHtml(m.repo)} → ${escapeHtml(m.path)} :${m.line}</a></div><pre><code>${highlightSnippet(m.snippet, m.match)}</code></pre>`; $("#results").prepend(el); }
-    function addErrorCard(message){ const el=document.createElement('div'); el.className='match'; el.innerHTML = `<div class="hdr"><span class="badge crit">error</span><span>${escapeHtml(message)}</span></div>`; $("#results").prepend(el); }
-    function exportJSON(matches){ const blob=new Blob([JSON.stringify({ generatedAt:new Date().toISOString(), matches }, null, 2)],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`github-secret-scan-${Date.now()}.json`; a.click(); URL.revokeObjectURL(url); }
-    function highlightSnippet(snippet, match){ const safe=escapeHtml(snippet); const m=escapeHtml(match); return safe.replace(m, `<mark>${m}</mark>`); }
+  function addMatch(m) {
+    const el = document.createElement('div');
+    el.className = 'match';
+    const sev = m.severity === 'critical' ? 'critical' : m.severity === 'high' ? 'high' : 'medium';
+    el.innerHTML = `
+      <div class="match-top">
+        <span class="badge ${sev}">${esc(m.severity)}</span>
+        <span class="match-pattern">${esc(m.pattern)}</span>
+        <a class="match-link" href="${m.html_url}" target="_blank" rel="noopener">${esc(m.repo)} / ${esc(m.path)} :${m.line}</a>
+      </div>
+      <pre><code>${highlight(m.snippet, m.match)}</code></pre>`;
+    $('#results').appendChild(el);
+  }
 
-    // Wire up
-    $("#resetPatterns").onclick = ()=> $("#patterns").value = JSON.stringify(DEFAULT_PATTERNS, null, 2);
-    $("#startBtn").onclick = (e)=>{ e.preventDefault(); startScan(); };
-    $("#stopBtn").onclick = (e)=>{ e.preventDefault(); stopScan(); };
-    // Seed defaults on first load
-    $("#patterns").value = JSON.stringify(DEFAULT_PATTERNS, null, 2);
-  </script>
+  function addInfo(msg) {
+    const el = document.createElement('div'); el.className = 'info-card'; el.textContent = msg;
+    $('#results').appendChild(el);
+  }
+
+  function addError(msg) {
+    const el = document.createElement('div'); el.className = 'error-card'; el.textContent = msg;
+    $('#results').appendChild(el);
+  }
+
+  function highlight(snippet, match) {
+    return esc(snippet).replace(esc(match), `<mark>${esc(match)}</mark>`);
+  }
+
+  function exportJSON(matches) {
+    const blob = new Blob([JSON.stringify({ generatedAt: new Date().toISOString(), matches }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `scan-${Date.now()}.json`; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  $('#actionBtn').onclick = e => {
+    e.preventDefault();
+    isScanning ? stopScan() : startScan();
+  };
+  $('#username').addEventListener('keydown', e => { if (e.key === 'Enter' && !isScanning) startScan(); });
+</script>
 </body>
 </html>
