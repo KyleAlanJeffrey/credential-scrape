@@ -791,7 +791,24 @@
         return;
       }
 
-      const SKIP = ['node_modules/', 'vendor/', 'dist/', 'build/', 'target/', '.next/', '.git/', '__pycache__/', 'venv/', '.venv/'];
+      const SKIP_DIRS = [
+        'node_modules/', 'vendor/', 'dist/', 'build/', 'target/', '.next/', '.git/',
+        '__pycache__/', 'venv/', '.venv/', '.tox/', '.mypy_cache/', '.pytest_cache/',
+        '.gradle/', '.mvn/', '.cargo/', 'bower_components/', 'jspm_packages/',
+        '.bundle/', '.eggs/', '.sass-cache/', '.cache/', '.parcel-cache/',
+        'coverage/', '.nyc_output/', 'obj/', 'bin/', 'packages/', 'artifacts/',
+        '.terraform/', '.serverless/', 'cdk.out/', '.aws-sam/',
+      ];
+      const SKIP_EXT = new Set([
+        '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.ico', '.svg', '.webp', '.avif',
+        '.mp3', '.mp4', '.wav', '.ogg', '.webm', '.mov', '.avi', '.flac',
+        '.woff', '.woff2', '.ttf', '.otf', '.eot',
+        '.zip', '.tar', '.gz', '.bz2', '.xz', '.7z', '.rar', '.jar', '.war',
+        '.exe', '.dll', '.so', '.dylib', '.bin', '.o', '.a', '.class', '.pyc', '.pyo',
+        '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+        '.lock', '.min.js', '.min.css', '.map',
+        '.DS_Store', '.wasm',
+      ]);
       const MAX = 512 * 1024;
       const jobs = [];
 
@@ -813,8 +830,14 @@
 
         for (const f of tree) {
           if (f.type !== 'blob') continue;
-          if (SKIP.some(d => f.path.startsWith(d))) continue;
+          if (SKIP_DIRS.some(d => f.path.includes(d))) continue;
           if (typeof f.size === 'number' && f.size > MAX) continue;
+          const dot = f.path.lastIndexOf('.');
+          if (dot !== -1 && SKIP_EXT.has(f.path.slice(dot).toLowerCase())) continue;
+          // Also skip common non-secret filenames
+          const name = f.path.split('/').pop();
+          if (name === '.DS_Store' || name === 'Thumbs.db' || name === 'desktop.ini') continue;
+          if (name === 'package-lock.json' || name === 'yarn.lock' || name === 'pnpm-lock.yaml' || name === 'composer.lock' || name === 'Gemfile.lock' || name === 'Cargo.lock' || name === 'poetry.lock' || name === 'go.sum') continue;
           jobs.push({ repo, branch, path: f.path, sha: f.sha });
         }
       }
