@@ -640,7 +640,7 @@
     const base = 'https://api.github.com';
     const headers = { 'Accept': 'application/vnd.github+json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) };
     let q = Promise.resolve();
-    const delay = token ? 80 : 150;
+    const delay = token ? 20 : 100;
 
     async function request(path) {
       for (;;) {
@@ -721,12 +721,30 @@
   let abort = null;
   let isScanning = false;
 
+  // Persistent state for pause/resume
+  let scanState = null; // { jobs, idx, done, allMatches, token, username, login, client }
+
+  function showResults(allMatches) {
+    const n = allMatches.length;
+    $('#findingsCount').textContent = n ? `${n} finding${n !== 1 ? 's' : ''}` : '';
+    if (n) {
+      $('#exportBtn').classList.add('visible'); $('#exportBtn').onclick = () => exportJSON(allMatches);
+      $('#shareBtn').classList.add('visible'); $('#shareBtn').onclick = () => shareResults(allMatches);
+    }
+  }
+
   async function startScan() {
     const token = $('#token').value.trim();
     const username = $('#username').value.trim();
     if (!username) { $('#username').focus(); return; }
 
+    // Resume from paused state if same user
+    if (scanState && scanState.username.toLowerCase() === username.toLowerCase() && scanState.idx < scanState.jobs.length) {
+      return resumeScan();
+    }
+
     isScanning = true;
+    scanState = null;
     document.body.classList.add('scanned');
     setScanning(true);
 
@@ -737,6 +755,7 @@
     $('#bar').style.width = '0%';
     $('#findingsCount').textContent = '';
     $('#exportBtn').classList.remove('visible');
+    $('#shareBtn').classList.remove('visible');
     hideRateBanner();
 
     abort = new AbortController();
@@ -774,7 +793,7 @@
 
       const SKIP = ['node_modules/', 'vendor/', 'dist/', 'build/', 'target/', '.next/', '.git/', '__pycache__/', 'venv/', '.venv/'];
       const MAX = 512 * 1024;
-      const jobs = []; // { label, fn }
+      const jobs = [];
 
       for (const repo of repos) {
         if (signal.aborted) break;
@@ -796,77 +815,124 @@
           if (f.type !== 'blob') continue;
           if (SKIP.some(d => f.path.startsWith(d))) continue;
           if (typeof f.size === 'number' && f.size > MAX) continue;
-          jobs.push({ repo, branch, path: f.path });
+          jobs.push({ repo, branch, path: f.path, sha: f.sha });
         }
       }
 
-      if (signal.aborted) return;
-
-      // Stop indeterminate, switch to real progress
-      $('#progressTrack').classList.remove('indeterminate');
-
-      const CONCURRENCY = token ? 3 : 1;
-      let inFlight = 0, idx = 0, done = 0;
-
-      async function next() {
-        if (signal.aborted || idx >= jobs.length) return;
-        const { repo, branch, path } = jobs[idx++];
-        inFlight++;
-
-        setStatus(`<span class="repo-name">${esc(repo.full_name)}</span> <span class="file-path">/ ${esc(path)}</span>`);
-
-        try {
-          const res = await scanFile(client, repo, branch, path);
-          done++;
-          const pct = Math.round(done / jobs.length * 100);
-          $('#stat-files').textContent = human(done);
-          $('#bar').style.width = `${pct}%`;
-          if (res?.length) {
-            allMatches.push(...res);
-            $('#stat-matches').textContent = human(allMatches.length);
-            res.forEach(addMatch);
-          }
-        } catch (e) {
-          if (e.name !== 'AbortError') addError(e.message);
-        } finally {
-          inFlight--;
-          next();
-        }
+      if (signal.aborted) {
+        // Save state so we can resume from where tree-fetching stopped
+        scanState = { jobs, idx: 0, done: 0, allMatches, token, username, login };
+        finishStop(allMatches, jobs, 0);
+        return;
       }
 
-      for (let i = 0; i < Math.min(CONCURRENCY, jobs.length); i++) next();
-      while ((idx < jobs.length || inFlight > 0) && !signal.aborted) await sleep(120);
+      // Save state and run file scanning
+      scanState = { jobs, idx: 0, done: 0, allMatches, token, username, login };
+      await runFileScanning(scanState);
 
-      if (!signal.aborted) {
-        clearStatus();
-        const n = allMatches.length;
-        $('#findingsCount').textContent = n ? `${n} finding${n !== 1 ? 's' : ''}` : '';
-        if (!n) $('#results').innerHTML = '<div class="empty-state">No secrets found.</div>';
-        if (n) {
-          $('#exportBtn').classList.add('visible'); $('#exportBtn').onclick = () => exportJSON(allMatches);
-          $('#shareBtn').classList.add('visible'); $('#shareBtn').onclick = () => shareResults(allMatches);
-        }
-      } else {
-        setStatus('Scan stopped.');
-      }
     } catch (err) {
       if (err.name !== 'AbortError') addError(err.message || String(err));
       clearStatus();
-    } finally {
       isScanning = false;
       setScanning(false);
       hideRateBanner();
     }
   }
 
+  async function resumeScan() {
+    isScanning = true;
+    setScanning(true);
+    hideRateBanner();
+
+    const token = scanState.token;
+    abort = new AbortController();
+
+    // Rebuild client with new signal
+    scanState.client = null;
+    await runFileScanning(scanState);
+  }
+
+  async function runFileScanning(state) {
+    const { jobs, allMatches } = state;
+    const token = state.token;
+    const { signal } = abort;
+    const client = githubClient(token, signal);
+
+    // Stop indeterminate, switch to real progress
+    $('#progressTrack').classList.remove('indeterminate');
+
+    const CONCURRENCY = token ? 8 : 3;
+    let inFlight = 0;
+
+    async function next() {
+      if (signal.aborted || state.idx >= jobs.length) return;
+      const { repo, branch, path, sha } = jobs[state.idx++];
+      inFlight++;
+
+      setStatus(`<span class="repo-name">${esc(repo.full_name)}</span> <span class="file-path">/ ${esc(path)}</span>`);
+
+      try {
+        const res = await scanFile(client, repo, branch, path, sha);
+        state.done++;
+        const pct = Math.round(state.done / jobs.length * 100);
+        $('#stat-files').textContent = human(state.done);
+        $('#bar').style.width = `${pct}%`;
+        if (res?.length) {
+          allMatches.push(...res);
+          $('#stat-matches').textContent = human(allMatches.length);
+          res.forEach(addMatch);
+        }
+      } catch (e) {
+        if (e.name !== 'AbortError') addError(e.message);
+      } finally {
+        inFlight--;
+        next();
+      }
+    }
+
+    for (let i = 0; i < Math.min(CONCURRENCY, jobs.length - state.idx); i++) next();
+    while ((state.idx < jobs.length || inFlight > 0) && !signal.aborted) await sleep(80);
+
+    if (!signal.aborted) {
+      clearStatus();
+      showResults(allMatches);
+      if (!allMatches.length) $('#results').innerHTML += '<div class="empty-state">No secrets found.</div>';
+      scanState = null; // fully complete
+    } else {
+      finishStop(allMatches, jobs, state.idx);
+    }
+
+    isScanning = false;
+    setScanning(false);
+    hideRateBanner();
+  }
+
+  function finishStop(allMatches, jobs, idx) {
+    const remaining = jobs.length - idx;
+    setStatus(`Paused — ${human(remaining)} file${remaining !== 1 ? 's' : ''} remaining. Press Scan to continue.`);
+    showResults(allMatches);
+
+    // Change button text to indicate resume
+    $('#actionBtn').textContent = 'Continue';
+    $('#actionBtn').classList.remove('stop-mode');
+  }
+
   function stopScan() {
     if (abort) abort.abort();
   }
 
-  async function scanFile(client, repo, branch, path) {
-    const { json: f } = await client.request(`/repos/${repo.owner.login}/${repo.name}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`);
-    if (!f || f.type !== 'file' || !f.content) return [];
-    const raw = atob(f.content.replace(/\n/g, ''));
+  async function scanFile(client, repo, branch, path, sha) {
+    // Use git blob API when sha is available (faster, no path encoding issues)
+    let raw;
+    if (sha) {
+      const { json: blob } = await client.request(`/repos/${repo.owner.login}/${repo.name}/git/blobs/${sha}`);
+      if (!blob || blob.encoding !== 'base64' || !blob.content) return [];
+      raw = atob(blob.content.replace(/\n/g, ''));
+    } else {
+      const { json: f } = await client.request(`/repos/${repo.owner.login}/${repo.name}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`);
+      if (!f || f.type !== 'file' || !f.content) return [];
+      raw = atob(f.content.replace(/\n/g, ''));
+    }
     const u8 = new Uint8Array(raw.length);
     for (let i = 0; i < raw.length; i++) u8[i] = raw.charCodeAt(i);
     if (looksBinary(u8)) return [];
