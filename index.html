@@ -377,8 +377,25 @@
       transition: color 0.15s, border-color 0.15s;
     }
 
-    .export-btn.visible { display: block; }
+    .export-btn.visible { display: inline-block; }
     .export-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.14); }
+
+    .share-btn {
+      display: none;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      margin-left: 6px;
+    }
+
+    .share-btn.visible { display: inline-block; }
+    .share-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.14); }
+    .share-btn.copied { color: #34d399; border-color: rgba(52,211,153,0.3); }
 
     /* ── Cards ── */
     .match {
@@ -525,6 +542,7 @@
     <div class="results-header">
       <div class="findings-count" id="findingsCount"></div>
       <button class="export-btn" id="exportBtn">Export JSON</button>
+      <button class="share-btn" id="shareBtn">Share Link</button>
     </div>
     <div id="results"></div>
   </div>
@@ -824,7 +842,10 @@
         const n = allMatches.length;
         $('#findingsCount').textContent = n ? `${n} finding${n !== 1 ? 's' : ''}` : '';
         if (!n) $('#results').innerHTML = '<div class="empty-state">No secrets found.</div>';
-        if (n) { $('#exportBtn').classList.add('visible'); $('#exportBtn').onclick = () => exportJSON(allMatches); }
+        if (n) {
+          $('#exportBtn').classList.add('visible'); $('#exportBtn').onclick = () => exportJSON(allMatches);
+          $('#shareBtn').classList.add('visible'); $('#shareBtn').onclick = () => shareResults(allMatches);
+        }
       } else {
         setStatus('Scan stopped.');
       }
@@ -891,11 +912,100 @@
     URL.revokeObjectURL(url);
   }
 
+  // ── Share helpers ───────────────────────────────────────────────────────────
+  async function compressData(str) {
+    const enc = new TextEncoder().encode(str);
+    const cs = new CompressionStream('deflate');
+    const writer = cs.writable.getWriter();
+    writer.write(enc); writer.close();
+    const chunks = []; const reader = cs.readable.getReader();
+    for (;;) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
+    const buf = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0));
+    let off = 0; for (const c of chunks) { buf.set(c, off); off += c.length; }
+    return btoa(String.fromCharCode(...buf)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  async function decompressData(b64) {
+    const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+    const u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    const ds = new DecompressionStream('deflate');
+    const writer = ds.writable.getWriter();
+    writer.write(u8); writer.close();
+    const chunks = []; const reader = ds.readable.getReader();
+    for (;;) { const { done, value } = await reader.read(); if (done) break; chunks.push(value); }
+    const buf = new Uint8Array(chunks.reduce((a, c) => a + c.length, 0));
+    let off = 0; for (const c of chunks) { buf.set(c, off); off += c.length; }
+    return new TextDecoder().decode(buf);
+  }
+
+  async function shareResults(matches) {
+    const data = JSON.stringify(matches);
+    const compressed = await compressData(data);
+    const url = location.origin + location.pathname + '#results=' + compressed;
+    await navigator.clipboard.writeText(url);
+    const btn = $('#shareBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Share Link'; btn.classList.remove('copied'); }, 2000);
+  }
+
+  async function restoreFromHash() {
+    const hash = location.hash;
+    if (!hash.startsWith('#results=')) return;
+    const compressed = hash.slice('#results='.length);
+    try {
+      const matches = JSON.parse(await decompressData(compressed));
+      document.body.classList.add('scanned');
+      $('#stat-repos').textContent = human(new Set(matches.map(m => m.repo)).size);
+      $('#stat-files').textContent = human(new Set(matches.map(m => m.repo + '/' + m.path)).size);
+      $('#stat-matches').textContent = human(matches.length);
+      $('#bar').style.width = '100%';
+      $('#findingsCount').textContent = `${matches.length} finding${matches.length !== 1 ? 's' : ''}`;
+      matches.forEach(addMatch);
+      $('#exportBtn').classList.add('visible');
+      $('#exportBtn').onclick = () => exportJSON(matches);
+      $('#shareBtn').classList.add('visible');
+      $('#shareBtn').onclick = () => shareResults(matches);
+    } catch (e) {
+      addError('Failed to restore shared results: ' + e.message);
+    }
+  }
+
+  // ── Cookie helpers ──────────────────────────────────────────────────────────
+  function setCookie(name, value, days = 365) {
+    const d = new Date(); d.setTime(d.getTime() + days * 86400000);
+    document.cookie = `${name}=${encodeURIComponent(value)};expires=${d.toUTCString()};path=/;SameSite=Lax`;
+  }
+
+  function getCookie(name) {
+    const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+    return match ? decodeURIComponent(match[1]) : '';
+  }
+
+  // Restore saved values on load
+  const savedToken = getCookie('gh_token');
+  const savedUser = getCookie('gh_username');
+  if (savedToken) $('#token').value = savedToken;
+  if (savedUser) $('#username').value = savedUser;
+
+  // Save token and username when a scan starts
+  const _origStartScan = startScan;
+  startScan = async function() {
+    const token = $('#token').value.trim();
+    const username = $('#username').value.trim();
+    if (token) setCookie('gh_token', token); else setCookie('gh_token', '', -1);
+    if (username) setCookie('gh_username', username);
+    return _origStartScan();
+  };
+
   $('#actionBtn').onclick = e => {
     e.preventDefault();
     isScanning ? stopScan() : startScan();
   };
   $('#username').addEventListener('keydown', e => { if (e.key === 'Enter' && !isScanning) startScan(); });
+
+  // Restore shared results from URL hash
+  restoreFromHash();
 </script>
 </body>
 </html>
