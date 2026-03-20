@@ -8,6 +8,17 @@ import type { Match, HistoryEntry } from '#/lib/types.ts'
 
 export const Route = createFileRoute('/results/$id')({
   component: ResultsPage,
+  head: () => ({
+    meta: [
+      { title: 'Scan Results — Secret Scanner' },
+      { name: 'description', content: 'View credential scan results for a GitHub repository or account. Findings include severity, risk assessment, and remediation guidance.' },
+      { property: 'og:title', content: 'Scan Results — Secret Scanner' },
+      { property: 'og:description', content: 'Credential scan results with severity ratings and remediation steps.' },
+      { name: 'twitter:title', content: 'Scan Results — Secret Scanner' },
+      { name: 'twitter:description', content: 'Credential scan results with severity ratings and remediation steps.' },
+      { name: 'robots', content: 'noindex' },
+    ],
+  }),
 })
 
 function ResultsPage() {
