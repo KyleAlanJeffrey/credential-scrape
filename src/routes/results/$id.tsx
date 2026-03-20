@@ -17,10 +17,7 @@ function ResultsPage() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    document.body.classList.add('scanned')
-    return () => document.body.classList.remove('scanned')
-  }, [])
+  // No body.scanned class needed — this page has no hero to collapse
 
   useEffect(() => {
     async function load() {
@@ -79,7 +76,7 @@ function ResultsPage() {
   }
 
   return (
-    <div className="page">
+    <div className="page page-enter">
       <div className="results-page-header">
         <Link to="/" className="back-link">&larr; Back to Scanner</Link>
         {entry && <h2 className="results-page-title">Scan: {entry.username}</h2>}

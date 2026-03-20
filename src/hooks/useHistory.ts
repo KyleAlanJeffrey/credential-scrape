@@ -47,6 +47,7 @@ export function useHistory() {
   const [entries, setEntries] = useState<HistoryEntry[]>([])
   const [savedToken, setSavedToken] = useState('')
   const [savedUsername, setSavedUsername] = useState('')
+  const [savedRepo, setSavedRepo] = useState('')
   const [rememberToken, setRememberToken] = useState(false)
 
   // Load from localStorage/cookies on mount (client only)
@@ -54,10 +55,11 @@ export function useHistory() {
     setEntries(getHistory())
     setSavedToken(getCookie('gh_token'))
     setSavedUsername(getCookie('gh_username'))
+    setSavedRepo(getCookie('gh_repo'))
     setRememberToken(localStorage.getItem(REMEMBER_KEY) === 'true')
   }, [])
 
-  const saveScan = useCallback((username: string, filesScanned: number, totalFiles: number, matches: Match[]) => {
+  const saveScan = useCallback((username: string, filesScanned: number, totalFiles: number, matches: Match[]): number => {
     const history = getHistory()
     const entry: HistoryEntry = {
       id: Date.now(),
@@ -70,13 +72,6 @@ export function useHistory() {
       hasResults: true,
     }
 
-    // Remove previous entry for same user (and its stored results)
-    const idx = history.findIndex(h => h.username.toLowerCase() === username.toLowerCase())
-    if (idx !== -1) {
-      deleteScanResults(history[idx]!.id)
-      history.splice(idx, 1)
-    }
-
     // Store full results
     const stored = saveScanResults(entry.id, matches)
     if (!stored) entry.hasResults = false
@@ -84,6 +79,7 @@ export function useHistory() {
     history.unshift(entry)
     saveHistoryToStorage(history)
     setEntries([...history])
+    return entry.id
   }, [])
 
   const deleteEntry = useCallback((id: number) => {
@@ -99,18 +95,18 @@ export function useHistory() {
     setEntries([])
   }, [])
 
-  const persistCredentials = useCallback((username: string, token: string, saveToken: boolean) => {
+  const persistCredentials = useCallback((token: string, saveToken: boolean) => {
     localStorage.setItem(REMEMBER_KEY, String(saveToken))
     setRememberToken(saveToken)
     if (saveToken && token) setCookie('gh_token', token)
     else setCookie('gh_token', '', -1)
-    if (username) setCookie('gh_username', username)
   }, [])
 
   return {
     entries,
     savedToken,
     savedUsername,
+    savedRepo,
     rememberToken,
     saveScan,
     deleteEntry,

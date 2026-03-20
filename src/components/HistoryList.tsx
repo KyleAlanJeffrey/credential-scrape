@@ -5,12 +5,11 @@ import type { HistoryEntry } from '#/lib/types.ts'
 
 interface HistoryListProps {
   entries: HistoryEntry[]
-  onSelect: (username: string) => void
   onDelete: (id: number) => void
   onClear: () => void
 }
 
-export default function HistoryList({ entries, onSelect, onDelete, onClear }: HistoryListProps) {
+export default function HistoryList({ entries, onDelete, onClear }: HistoryListProps) {
   if (!entries.length) return null
 
   return (
@@ -24,11 +23,7 @@ export default function HistoryList({ entries, onSelect, onDelete, onClear }: Hi
       <ul className="history-list">
         {entries.map(h => (
           <li key={h.id} className="history-item">
-            <span
-              className="history-user"
-              onClick={() => onSelect(h.username)}
-              title="Use this username"
-            >
+            <span className="history-user">
               {h.username}
             </span>
             <span className="history-meta">

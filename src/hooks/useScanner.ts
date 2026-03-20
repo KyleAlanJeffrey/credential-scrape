@@ -59,6 +59,7 @@ export function useScanner() {
   const [rateBanner, setRateBanner] = useState<string | null>(null)
   const [matches, setMatches] = useState<Match[]>([])
   const [messages, setMessages] = useState<Message[]>([])
+  const [resolvedName, setResolvedName] = useState('')
 
   const abortRef = useRef<AbortController | null>(null)
   const scanStateRef = useRef<ScanRunState | null>(null)
@@ -205,16 +206,18 @@ export function useScanner() {
       if (mode === 'repo') {
         // Single repo mode: target is "owner/repo" or a GitHub URL
         const { owner, repo: repoName } = parseRepoInput(target)
+        setResolvedName(`${owner}/${repoName}`)
 
         if (!token) {
           addMessage('info', 'No token — scanning public repo only (rate limit ~60 req/hr).')
         }
 
-        setStatus({ text: `Fetching ${esc(target)}…`, rateLimited: false })
+        setStatus({ text: `Fetching ${esc(owner)}/${esc(repoName)}…`, rateLimited: false })
         repos = await fetchSingleRepo(client, owner, repoName)
         login = owner
       } else {
         // Account mode: target is a username
+        setResolvedName(target)
         if (token) {
           const { json: me } = await client.request('/user')
           login = me.login
@@ -308,6 +311,7 @@ export function useScanner() {
     isScanning,
     hasScanned,
     isPaused,
+    resolvedName,
     stats,
     progress,
     status,

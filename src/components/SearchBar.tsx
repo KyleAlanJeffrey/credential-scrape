@@ -8,25 +8,42 @@ interface SearchBarProps {
   isScanning: boolean
   isPaused: boolean
   savedUsername: string
+  savedRepo: string
   savedToken: string
   savedRemember: boolean
 }
 
-export default function SearchBar({ onScan, onStop, isScanning, isPaused, savedUsername, savedToken, savedRemember }: SearchBarProps) {
+function usePersistedInput(key: string, fallback: string) {
+  const [value, setValue] = useState(fallback)
+  useEffect(() => {
+    const stored = localStorage.getItem(key)
+    if (stored !== null) setValue(stored)
+  }, [key])
+  const set = (v: string) => {
+    setValue(v)
+    localStorage.setItem(key, v)
+  }
+  return [value, set] as const
+}
+
+export default function SearchBar({ onScan, onStop, isScanning, isPaused, savedUsername: _su, savedRepo: _sr, savedToken, savedRemember }: SearchBarProps) {
   const [mode, setMode] = useState<ScanMode>('account')
-  const [username, setUsername] = useState('')
-  const [repoInput, setRepoInput] = useState('')
+  const [username, setUsername] = usePersistedInput('input_username', '')
+  const [repoInput, setRepoInput] = usePersistedInput('input_repo', '')
   const [token, setToken] = useState('')
   const [saveToken, setSaveToken] = useState(false)
   const [showTokenInfo, setShowTokenInfo] = useState(false)
   const popoverRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
 
+  // Migrate from cookie values on first load if localStorage is empty
   useEffect(() => {
-    if (savedUsername) setUsername(savedUsername)
+    if (_su && !localStorage.getItem('input_username')) setUsername(_su)
+    if (_sr && !localStorage.getItem('input_repo')) setRepoInput(_sr)
     if (savedToken) setToken(savedToken)
     setSaveToken(savedRemember)
-  }, [savedUsername, savedToken, savedRemember])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [_su, _sr, savedToken, savedRemember])
 
   useEffect(() => {
     if (!showTokenInfo) return
@@ -78,16 +95,18 @@ export default function SearchBar({ onScan, onStop, isScanning, isPaused, savedU
 
   return (
     <>
-      <div className="scan-mode-tabs">
+      <div className={`scan-mode-tabs${isScanning || isPaused ? ' locked' : ''}`}>
         <button
           className={`scan-mode-tab${mode === 'account' ? ' active' : ''}`}
           onClick={() => setMode('account')}
+          disabled={isScanning || isPaused}
         >
           Account
         </button>
         <button
           className={`scan-mode-tab${mode === 'repo' ? ' active' : ''}`}
           onClick={() => setMode('repo')}
+          disabled={isScanning || isPaused}
         >
           Repository
         </button>

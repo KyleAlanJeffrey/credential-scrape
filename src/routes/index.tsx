@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import SearchBar, { type ScanMode } from '#/components/SearchBar.tsx'
 import HistoryList from '#/components/HistoryList.tsx'
 import ResultsArea from '#/components/ResultsArea.tsx'
@@ -14,8 +14,8 @@ function HomePage() {
   const scanner = useScanner()
   const history = useHistory()
   const navigate = useNavigate()
-  const usernameRef = useRef<string>('')
   const tokenRef = useRef<string>('')
+  const [transitioning, setTransitioning] = useState(false)
 
   // Redirect old-format shared URLs to /results/shared
   useEffect(() => {
@@ -24,28 +24,27 @@ function HomePage() {
     }
   }, [navigate])
 
-  // Save to history when scan completes
+  // Navigate to results page when scan completes
   useEffect(() => {
     if (!scanner.isScanning && !scanner.isPaused && scanner.hasScanned && scanner.stats.files > 0) {
-      history.saveScan(usernameRef.current, scanner.stats.files, scanner.stats.files, scanner.matches)
+      const id = history.saveScan(scanner.resolvedName, scanner.stats.files, scanner.stats.files, scanner.matches)
+      setTransitioning(true)
+      setTimeout(() => {
+        navigate({ to: '/results/$id', params: { id: String(id) } })
+      }, 600)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanner.isScanning, scanner.isPaused])
 
   const handleScan = (target: string, token: string, saveToken: boolean, mode: ScanMode) => {
     if (!target) return
-    usernameRef.current = target
     tokenRef.current = token
-    history.persistCredentials(target, token, saveToken)
+    history.persistCredentials(token, saveToken)
     scanner.startScan(target, token, mode)
   }
 
-  const handleHistorySelect = (username: string) => {
-    usernameRef.current = username
-  }
-
   return (
-    <div className="page">
+    <div className={`page${transitioning ? ' page-exit' : ''}`}>
       <div className="hero">
         <h1 className="logo">Secret Scanner</h1>
         <p className="tagline">Find leaked credentials across GitHub repositories.</p>
@@ -56,19 +55,19 @@ function HomePage() {
           isScanning={scanner.isScanning}
           isPaused={scanner.isPaused}
           savedUsername={history.savedUsername}
+          savedRepo={history.savedRepo}
           savedToken={history.savedToken}
           savedRemember={history.rememberToken}
         />
-      </div>
 
-      {!scanner.hasScanned && (
-        <HistoryList
-          entries={history.entries}
-          onSelect={handleHistorySelect}
-          onDelete={history.deleteEntry}
-          onClear={history.clearAll}
-        />
-      )}
+        {!scanner.hasScanned && (
+          <HistoryList
+            entries={history.entries}
+            onDelete={history.deleteEntry}
+            onClear={history.clearAll}
+          />
+        )}
+      </div>
 
       {scanner.hasScanned && (
         <ResultsArea
