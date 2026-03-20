@@ -77,8 +77,8 @@ export function useHistory() {
     setEntries([])
   }, [])
 
-  const persistCredentials = useCallback((username: string, token: string) => {
-    if (token) setCookie('gh_token', token)
+  const persistCredentials = useCallback((username: string, token: string, saveToken: boolean) => {
+    if (saveToken && token) setCookie('gh_token', token)
     else setCookie('gh_token', '', -1)
     if (username) setCookie('gh_username', username)
   }, [])
