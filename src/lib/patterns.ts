@@ -50,7 +50,7 @@ export const PATTERNS: Pattern[] = [
   { name: 'Twilio Account SID',          regex: 'AC[0-9a-fA-F]{32}',                                                          flags: 'g',  severity: 'medium'   },
 
   // ── Infrastructure / DevOps ──
-  { name: 'Heroku API Key',              regex: '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', flags: 'g', severity: 'medium' },
+  { name: 'Heroku API Key',              regex: '(?:heroku|HEROKU).{0,20}[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}', flags: 'gi', severity: 'medium' },
   { name: 'Datadog API Key',             regex: 'dd(.{0,10})?(api|app).{0,10}["\'][0-9a-f]{32,40}["\']',                      flags: 'gi', severity: 'high'     },
   { name: 'npm Token',                   regex: 'npm_[A-Za-z0-9]{36}',                                                        flags: 'g',  severity: 'high'     },
   { name: 'PyPI Token',                  regex: 'pypi-[A-Za-z0-9_\\-]{50,}',                                                  flags: 'g',  severity: 'high'     },
