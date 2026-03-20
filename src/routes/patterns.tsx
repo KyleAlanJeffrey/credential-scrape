@@ -35,11 +35,14 @@ function PatternsPage() {
             <div className="patterns-page-grid">
               {patterns.map(p => {
                 const info = PATTERN_DESCRIPTIONS[p.name]
+                const slug = p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '')
                 return (
-                  <div key={p.name} className={`patterns-page-card severity-border-${p.severity}`}>
+                  <article key={p.name} id={slug} className={`patterns-page-card severity-border-${p.severity}`}>
                     <div className="patterns-page-card-header">
                       <span className={`badge ${p.severity}`}>{p.severity}</span>
-                      <span className="patterns-page-card-name">{p.name}</span>
+                      <h3 className="patterns-page-card-name">
+                        <a href={`#${slug}`} className="patterns-anchor">{p.name}</a>
+                      </h3>
                     </div>
                     {info && (
                       <>
@@ -59,7 +62,7 @@ function PatternsPage() {
                     <div className="patterns-page-card-regex">
                       <code>{p.regex}</code>
                     </div>
-                  </div>
+                  </article>
                 )
               })}
             </div>

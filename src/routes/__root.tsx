@@ -31,8 +31,11 @@ function QueryProvider({ children }: { children: ReactNode }) {
 // ── SEO ─────────────────────────────────────────────────────────────────────
 
 const SITE_NAME = "Secret Scanner";
+const SITE_URL = "https://scraper.kylejeffrey.com";
 const DEFAULT_DESCRIPTION =
-  "Scan GitHub repositories for leaked API keys, tokens, passwords, and other secrets. Detect 40+ credential patterns across cloud providers, payment systems, and more.";
+  "Free online tool to scan GitHub repositories for leaked API keys, tokens, passwords, and secrets. Detect 40+ credential patterns including AWS keys, Stripe keys, OpenAI tokens, private keys, and database connection strings. Runs entirely in the browser.";
+const DEFAULT_KEYWORDS =
+  "github secret scanner, scan github for leaked credentials, github api key leak detector, find exposed secrets github, github token scanner, credential scanner github repositories, leaked api keys github, github security audit tool, secret detection, credential leak scanner, aws key scanner, stripe key detector, openai key leak, private key scanner github";
 
 // ── Route ───────────────────────────────────────────────────────────────────
 
@@ -43,11 +46,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: `${SITE_NAME} — Find Leaked Credentials on GitHub` },
       { name: "description", content: DEFAULT_DESCRIPTION },
-      {
-        name: "keywords",
-        content:
-          "secret scanner, credential leak, GitHub security, API key scanner, token detection, security audit, AWS keys, Stripe keys, OpenAI keys",
-      },
+      { name: "keywords", content: DEFAULT_KEYWORDS },
       { name: "author", content: SITE_NAME },
       { name: "robots", content: "index, follow" },
       { name: "theme-color", content: "#020810" },
@@ -65,6 +64,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "canonical", href: SITE_URL },
       {
         rel: "icon",
         href: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>",
@@ -77,11 +77,33 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 // ── Shell ───────────────────────────────────────────────────────────────────
 
+const JSON_LD = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: SITE_NAME,
+  url: SITE_URL,
+  description: DEFAULT_DESCRIPTION,
+  applicationCategory: "SecurityApplication",
+  operatingSystem: "Any",
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  featureList: [
+    "Scan GitHub accounts for leaked credentials",
+    "Scan individual GitHub repositories",
+    "Detect 40+ secret patterns (AWS, Stripe, OpenAI, etc.)",
+    "Client-side only — no data leaves your browser",
+    "Shareable scan results via URL",
+    "JSON export of findings",
+    "Severity classification (critical, high, medium)",
+    "Remediation guidance for each finding",
+  ],
+});
+
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
         <HeadContent />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON_LD }} />
       </head>
       <body>
         <QueryProvider>

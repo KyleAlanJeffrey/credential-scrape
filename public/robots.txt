@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Allow: /patterns
+Disallow: /results/
+
+Sitemap: https://scraper.kylejeffrey.com/sitemap.xml

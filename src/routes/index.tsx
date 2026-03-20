@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import SearchBar, { type ScanMode } from '#/components/SearchBar.tsx'
+import SeoContent from '#/components/SeoContent.tsx'
 import PatternsInfo from '#/components/PatternsInfo.tsx'
 import HistoryList from '#/components/HistoryList.tsx'
 import ResultsArea from '#/components/ResultsArea.tsx'
@@ -11,12 +12,12 @@ export const Route = createFileRoute('/')({
   component: HomePage,
   head: () => ({
     meta: [
-      { title: 'Secret Scanner — Find Leaked Credentials on GitHub' },
-      { name: 'description', content: 'Scan a GitHub user or repository for leaked API keys, tokens, passwords, and secrets. Free, client-side, no data leaves your browser.' },
-      { property: 'og:title', content: 'Secret Scanner — Find Leaked Credentials on GitHub' },
-      { property: 'og:description', content: 'Scan a GitHub user or repository for leaked API keys, tokens, passwords, and secrets.' },
-      { name: 'twitter:title', content: 'Secret Scanner — Find Leaked Credentials on GitHub' },
-      { name: 'twitter:description', content: 'Scan a GitHub user or repository for leaked API keys, tokens, passwords, and secrets.' },
+      { title: 'GitHub Secret Scanner — Scan for Leaked API Keys, Tokens & Credentials' },
+      { name: 'description', content: 'Free tool to scan GitHub repositories for leaked API keys, tokens, passwords, and secrets. Detect AWS keys, Stripe keys, OpenAI tokens, private keys, and 40+ credential patterns. Runs entirely in your browser.' },
+      { property: 'og:title', content: 'GitHub Secret Scanner — Scan for Leaked API Keys & Credentials' },
+      { property: 'og:description', content: 'Free tool to scan GitHub repos for leaked API keys, tokens, passwords, and 40+ secret patterns. No data leaves your browser.' },
+      { name: 'twitter:title', content: 'GitHub Secret Scanner — Find Leaked Credentials' },
+      { name: 'twitter:description', content: 'Free tool to scan GitHub repos for leaked API keys, tokens, passwords, and 40+ secret patterns.' },
     ],
   }),
 })
@@ -92,6 +93,8 @@ function HomePage() {
           messages={scanner.messages}
         />
       )}
+
+      {!scanner.hasScanned && <SeoContent />}
     </div>
   )
 }
