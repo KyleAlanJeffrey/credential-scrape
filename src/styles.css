@@ -55,7 +55,7 @@ body::after {
 
 body.scanned::after { opacity: 0; }
 
-.page { position: relative; z-index: 1; }
+.page { position: relative; isolation: isolate; }
 
 /* ── Page transitions ── */
 .page-exit {

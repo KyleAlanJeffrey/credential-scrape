@@ -1,8 +1,8 @@
 // ── Imports ──────────────────────────────────────────────────────────────────
 
+import { TanStackDevtools } from "@tanstack/react-devtools";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtoolsPanel } from "@tanstack/react-query-devtools";
-import { TanStackDevtools } from "@tanstack/react-devtools";
 import { HeadContent, Link, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import type { ReactNode } from "react";
@@ -25,11 +25,7 @@ export function getContext() {
 }
 
 function QueryProvider({ children }: { children: ReactNode }) {
-  return (
-    <QueryClientProvider client={getContext().queryClient}>
-      {children}
-    </QueryClientProvider>
-  );
+  return <QueryClientProvider client={getContext().queryClient}>{children}</QueryClientProvider>;
 }
 
 // ── SEO ─────────────────────────────────────────────────────────────────────
@@ -47,7 +43,11 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: `${SITE_NAME} — Find Leaked Credentials on GitHub` },
       { name: "description", content: DEFAULT_DESCRIPTION },
-      { name: "keywords", content: "secret scanner, credential leak, GitHub security, API key scanner, token detection, security audit, AWS keys, Stripe keys, OpenAI keys" },
+      {
+        name: "keywords",
+        content:
+          "secret scanner, credential leak, GitHub security, API key scanner, token detection, security audit, AWS keys, Stripe keys, OpenAI keys",
+      },
       { name: "author", content: SITE_NAME },
       { name: "robots", content: "index, follow" },
       { name: "theme-color", content: "#020810" },
@@ -65,7 +65,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>" },
+      {
+        rel: "icon",
+        href: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>",
+      },
     ],
   }),
   shellComponent: RootDocument,
@@ -84,7 +87,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <QueryProvider>
           {children}
           <TanStackDevtools
-            config={{ position: "bottom-right", defaultOpen: true, openHotkey: ["Control", "d"] }}
+            config={{ position: "bottom-right" }}
             plugins={[
               { name: "Tanstack Router", render: <TanStackRouterDevtoolsPanel /> },
               { name: "Tanstack Query", render: <ReactQueryDevtoolsPanel /> },
@@ -101,10 +104,24 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 
 function NotFound() {
   return (
-    <div className="page" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "100vh", padding: 20 }}>
-      <h1 style={{ fontSize: 48, fontWeight: 800, color: "var(--color-muted)", marginBottom: 8 }}>404</h1>
+    <div
+      className="page"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "100vh",
+        padding: 20,
+      }}
+    >
+      <h1 style={{ fontSize: 48, fontWeight: 800, color: "var(--color-muted)", marginBottom: 8 }}>
+        404
+      </h1>
       <p style={{ color: "var(--color-muted)", marginBottom: 20 }}>Page not found</p>
-      <Link to="/" style={{ color: "var(--color-accent)", textDecoration: "none", fontSize: 14 }}>&larr; Back to Scanner</Link>
+      <Link to="/" style={{ color: "var(--color-accent)", textDecoration: "none", fontSize: 14 }}>
+        &larr; Back to Scanner
+      </Link>
     </div>
   );
 }
