@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { HistoryEntry, Match } from '#/lib/types.ts'
+import { saveScanResults, deleteScanResults, clearAllScanResults } from '#/lib/scanStorage.ts'
 
 const HISTORY_KEY = 'scan_history'
+const REMEMBER_KEY = 'gh_remember_token'
 const MAX_HISTORY = 20
 
 function getHistory(): HistoryEntry[] {
@@ -36,16 +38,23 @@ export function formatRelative(date: Date): string {
   return date.toLocaleDateString()
 }
 
+export function getHistoryEntry(id: number): HistoryEntry | null {
+  const history = getHistory()
+  return history.find(h => h.id === id) ?? null
+}
+
 export function useHistory() {
   const [entries, setEntries] = useState<HistoryEntry[]>([])
   const [savedToken, setSavedToken] = useState('')
   const [savedUsername, setSavedUsername] = useState('')
+  const [rememberToken, setRememberToken] = useState(false)
 
   // Load from localStorage/cookies on mount (client only)
   useEffect(() => {
     setEntries(getHistory())
     setSavedToken(getCookie('gh_token'))
     setSavedUsername(getCookie('gh_username'))
+    setRememberToken(localStorage.getItem(REMEMBER_KEY) === 'true')
   }, [])
 
   const saveScan = useCallback((username: string, filesScanned: number, totalFiles: number, matches: Match[]) => {
@@ -58,26 +67,41 @@ export function useHistory() {
       totalFiles,
       findings: matches.length,
       repos: new Set(matches.map(m => m.repo)).size,
+      hasResults: true,
     }
+
+    // Remove previous entry for same user (and its stored results)
     const idx = history.findIndex(h => h.username.toLowerCase() === username.toLowerCase())
-    if (idx !== -1) history.splice(idx, 1)
+    if (idx !== -1) {
+      deleteScanResults(history[idx]!.id)
+      history.splice(idx, 1)
+    }
+
+    // Store full results
+    const stored = saveScanResults(entry.id, matches)
+    if (!stored) entry.hasResults = false
+
     history.unshift(entry)
     saveHistoryToStorage(history)
     setEntries([...history])
   }, [])
 
   const deleteEntry = useCallback((id: number) => {
+    deleteScanResults(id)
     const history = getHistory().filter(h => h.id !== id)
     saveHistoryToStorage(history)
     setEntries([...history])
   }, [])
 
   const clearAll = useCallback(() => {
+    clearAllScanResults()
     localStorage.removeItem(HISTORY_KEY)
     setEntries([])
   }, [])
 
   const persistCredentials = useCallback((username: string, token: string, saveToken: boolean) => {
+    localStorage.setItem(REMEMBER_KEY, String(saveToken))
+    setRememberToken(saveToken)
     if (saveToken && token) setCookie('gh_token', token)
     else setCookie('gh_token', '', -1)
     if (username) setCookie('gh_username', username)
@@ -87,6 +111,7 @@ export function useHistory() {
     entries,
     savedToken,
     savedUsername,
+    rememberToken,
     saveScan,
     deleteEntry,
     clearAll,

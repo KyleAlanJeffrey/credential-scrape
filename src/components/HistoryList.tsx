@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { human } from '#/lib/utils.ts'
 import { formatRelative } from '#/hooks/useHistory.ts'
 import type { HistoryEntry } from '#/lib/types.ts'
@@ -22,12 +23,14 @@ export default function HistoryList({ entries, onSelect, onDelete, onClear }: Hi
       </div>
       <ul className="history-list">
         {entries.map(h => (
-          <li
-            key={h.id}
-            className="history-item"
-            onClick={() => onSelect(h.username)}
-          >
-            <span className="history-user">{h.username}</span>
+          <li key={h.id} className="history-item">
+            <span
+              className="history-user"
+              onClick={() => onSelect(h.username)}
+              title="Use this username"
+            >
+              {h.username}
+            </span>
             <span className="history-meta">
               <span>
                 <strong>{human(h.findings)}</strong> finding{h.findings !== 1 ? 's' : ''}
@@ -37,6 +40,17 @@ export default function HistoryList({ entries, onSelect, onDelete, onClear }: Hi
               </span>
             </span>
             <span className="history-date">{formatRelative(new Date(h.date))}</span>
+            {h.hasResults && (
+              <Link
+                to="/results/$id"
+                params={{ id: String(h.id) }}
+                className="history-view"
+                title="View results"
+                onClick={e => e.stopPropagation()}
+              >
+                View
+              </Link>
+            )}
             <button
               className="history-delete"
               title="Remove"

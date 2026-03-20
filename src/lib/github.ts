@@ -1,4 +1,4 @@
-import { sleep } from './utils.ts'
+import { sleep, abortableSleep } from './utils.ts'
 
 export interface RateLimitCallbacks {
   onStatusUpdate: (text: string, rateLimited: boolean) => void
@@ -39,7 +39,7 @@ export function githubClient(
         if (msg.includes('rate limit') || res.status === 429) {
           const resetHeader = res.headers.get('x-ratelimit-reset')
           const resetAt = resetHeader ? parseInt(resetHeader) * 1000 : Date.now() + 65_000
-          await waitForRateLimit(resetAt, !!token, callbacks)
+          await waitForRateLimit(resetAt, !!token, signal, callbacks)
           continue
         }
         const t = JSON.stringify(body)
@@ -77,6 +77,7 @@ export function githubClient(
 async function waitForRateLimit(
   resetAt: number,
   hasToken: boolean,
+  signal: AbortSignal,
   callbacks: RateLimitCallbacks,
 ) {
   const buffer = 3000
@@ -101,7 +102,10 @@ async function waitForRateLimit(
   )
 
   const remaining = waitUntil - Date.now()
-  if (remaining > 0) await sleep(remaining)
-  clearInterval(interval)
-  callbacks.onRateBannerHide()
+  try {
+    if (remaining > 0) await abortableSleep(remaining, signal)
+  } finally {
+    clearInterval(interval)
+    callbacks.onRateBannerHide()
+  }
 }

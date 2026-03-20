@@ -38,6 +38,12 @@ export interface HistoryEntry {
   totalFiles: number
   findings: number
   repos: number
+  hasResults?: boolean
+}
+
+export interface ScanResult {
+  entry: HistoryEntry
+  matches: Match[]
 }
 
 export interface ScanJob {

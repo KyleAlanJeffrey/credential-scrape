@@ -3,7 +3,8 @@ import { githubClient } from '#/lib/github.ts'
 import { scanFile, SKIP_DIRS, SKIP_EXT, MAX_FILE_SIZE, SKIP_FILENAMES } from '#/lib/scanner.ts'
 import { esc, human, sleep } from '#/lib/utils.ts'
 import type { Match, Message, ScanJob } from '#/lib/types.ts'
-import type { RateLimitCallbacks } from '#/lib/github.ts'
+import type { RateLimitCallbacks, GitHubClient } from '#/lib/github.ts'
+import type { ScanMode } from '#/components/SearchBar.tsx'
 
 interface ScanRunState {
   jobs: ScanJob[]
@@ -13,6 +14,39 @@ interface ScanRunState {
   token: string
   username: string
   login: string
+}
+
+function parseRepoInput(input: string): { owner: string; repo: string } {
+  // Handle GitHub URLs: https://github.com/owner/repo[/...]
+  try {
+    const url = new URL(input)
+    if (url.hostname === 'github.com' || url.hostname === 'www.github.com') {
+      const parts = url.pathname.split('/').filter(Boolean)
+      if (parts.length >= 2) {
+        return { owner: parts[0]!, repo: parts[1]! }
+      }
+    }
+  } catch { /* not a URL, try owner/repo */ }
+
+  const slash = input.indexOf('/')
+  if (slash > 0 && slash < input.length - 1) {
+    return { owner: input.slice(0, slash), repo: input.slice(slash + 1) }
+  }
+
+  throw new Error('Enter a repository as owner/repo or paste a GitHub URL')
+}
+
+function filterTree(tree: any[], jobs: ScanJob[], repo: any, branch: string) {
+  for (const f of tree) {
+    if (f.type !== 'blob') continue
+    if (SKIP_DIRS.some((d: string) => f.path.includes(d))) continue
+    if (typeof f.size === 'number' && f.size > MAX_FILE_SIZE) continue
+    const dot = f.path.lastIndexOf('.')
+    if (dot !== -1 && SKIP_EXT.has(f.path.slice(dot).toLowerCase())) continue
+    const name = f.path.split('/').pop()
+    if (SKIP_FILENAMES.has(name)) continue
+    jobs.push({ repo, branch, path: f.path, sha: f.sha })
+  }
 }
 
 export function useScanner() {
@@ -30,7 +64,6 @@ export function useScanner() {
   const scanStateRef = useRef<ScanRunState | null>(null)
   const msgIdRef = useRef(0)
 
-  // Manage body.scanned class for background CSS effects
   useEffect(() => {
     if (hasScanned) {
       document.body.classList.add('scanned')
@@ -109,13 +142,35 @@ export function useScanner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addMessage])
 
-  const startScan = useCallback(async (username: string, token: string) => {
-    if (!username) return
+  async function fetchReposForAccount(
+    client: GitHubClient,
+    username: string,
+    login: string,
+    token: string,
+  ) {
+    return token
+      ? (await client.paged('/user/repos?per_page=100&affiliation=owner&visibility=all&sort=updated'))
+          .filter((r: any) => r.owner?.login?.toLowerCase() === login.toLowerCase() && !r.fork && !r.archived)
+      : (await client.paged(`/users/${encodeURIComponent(username)}/repos?type=owner&per_page=100&sort=updated`))
+          .filter((r: any) => !r.fork && !r.archived)
+  }
 
-    // Resume from paused state if same user
+  async function fetchSingleRepo(
+    client: GitHubClient,
+    owner: string,
+    repo: string,
+  ) {
+    const { json } = await client.request(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`)
+    return [json]
+  }
+
+  const startScan = useCallback(async (target: string, token: string, mode: ScanMode = 'account') => {
+    if (!target) return
+
+    // Resume from paused state if same target
     if (
       scanStateRef.current &&
-      scanStateRef.current.username.toLowerCase() === username.toLowerCase() &&
+      scanStateRef.current.username.toLowerCase() === target.toLowerCase() &&
       scanStateRef.current.idx < scanStateRef.current.jobs.length
     ) {
       setIsScanning(true)
@@ -144,24 +199,35 @@ export function useScanner() {
     try {
       setStatus({ text: 'Connecting to GitHub…', rateLimited: false })
 
-      let login = username
-      if (token) {
-        const { json: me } = await client.request('/user')
-        login = me.login
-        if (login.toLowerCase() !== username.toLowerCase()) {
-          throw new Error(`Token belongs to "${login}" but you entered "${username}".`)
+      let repos: any[]
+      let login = target
+
+      if (mode === 'repo') {
+        // Single repo mode: target is "owner/repo" or a GitHub URL
+        const { owner, repo: repoName } = parseRepoInput(target)
+
+        if (!token) {
+          addMessage('info', 'No token — scanning public repo only (rate limit ~60 req/hr).')
         }
+
+        setStatus({ text: `Fetching ${esc(target)}…`, rateLimited: false })
+        repos = await fetchSingleRepo(client, owner, repoName)
+        login = owner
       } else {
-        addMessage('info', 'No token — scanning public repos only (rate limit ~60 req/hr). Add a token above for private repos and higher limits.')
+        // Account mode: target is a username
+        if (token) {
+          const { json: me } = await client.request('/user')
+          login = me.login
+          if (login.toLowerCase() !== target.toLowerCase()) {
+            throw new Error(`Token belongs to "${login}" but you entered "${target}".`)
+          }
+        } else {
+          addMessage('info', 'No token — scanning public repos only (rate limit ~60 req/hr). Add a token above for private repos and higher limits.')
+        }
+
+        setStatus({ text: 'Fetching repository list…', rateLimited: false })
+        repos = await fetchReposForAccount(client, target, login, token)
       }
-
-      setStatus({ text: 'Fetching repository list…', rateLimited: false })
-
-      const repos = token
-        ? (await client.paged('/user/repos?per_page=100&affiliation=owner&visibility=all&sort=updated'))
-            .filter((r: any) => r.owner?.login?.toLowerCase() === login.toLowerCase() && !r.fork && !r.archived)
-        : (await client.paged(`/users/${encodeURIComponent(username)}/repos?type=owner&per_page=100&sort=updated`))
-            .filter((r: any) => !r.fork && !r.archived)
 
       setStats(s => ({ ...s, repos: repos.length }))
 
@@ -194,19 +260,10 @@ export function useScanner() {
           continue
         }
 
-        for (const f of tree) {
-          if (f.type !== 'blob') continue
-          if (SKIP_DIRS.some((d: string) => f.path.includes(d))) continue
-          if (typeof f.size === 'number' && f.size > MAX_FILE_SIZE) continue
-          const dot = f.path.lastIndexOf('.')
-          if (dot !== -1 && SKIP_EXT.has(f.path.slice(dot).toLowerCase())) continue
-          const name = f.path.split('/').pop()
-          if (SKIP_FILENAMES.has(name)) continue
-          jobs.push({ repo, branch, path: f.path, sha: f.sha })
-        }
+        filterTree(tree, jobs, repo, branch)
       }
 
-      const state: ScanRunState = { jobs, idx: 0, done: 0, allMatches, token, username, login }
+      const state: ScanRunState = { jobs, idx: 0, done: 0, allMatches, token, username: target, login }
       scanStateRef.current = state
 
       if (signal.aborted) {

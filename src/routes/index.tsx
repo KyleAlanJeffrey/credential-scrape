@@ -1,11 +1,10 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
-import SearchBar from '#/components/SearchBar.tsx'
+import SearchBar, { type ScanMode } from '#/components/SearchBar.tsx'
 import HistoryList from '#/components/HistoryList.tsx'
 import ResultsArea from '#/components/ResultsArea.tsx'
 import { useScanner } from '#/hooks/useScanner.ts'
 import { useHistory } from '#/hooks/useHistory.ts'
-import { restoreFromHash } from '#/lib/share.ts'
 
 export const Route = createFileRoute('/')({
   component: HomePage,
@@ -14,31 +13,31 @@ export const Route = createFileRoute('/')({
 function HomePage() {
   const scanner = useScanner()
   const history = useHistory()
+  const navigate = useNavigate()
   const usernameRef = useRef<string>('')
   const tokenRef = useRef<string>('')
 
-  // Restore shared results from URL hash
+  // Redirect old-format shared URLs to /results/shared
   useEffect(() => {
-    restoreFromHash().then(matches => {
-      if (matches) scanner.restoreResults(matches)
-    }).catch(() => { /* ignore */ })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (typeof window !== 'undefined' && window.location.hash.startsWith('#results=')) {
+      navigate({ to: '/results/$id', params: { id: 'shared' }, hash: window.location.hash })
+    }
+  }, [navigate])
 
   // Save to history when scan completes
   useEffect(() => {
-    if (!scanner.isScanning && !scanner.isPaused && scanner.hasScanned && scanner.matches.length >= 0 && scanner.stats.files > 0) {
+    if (!scanner.isScanning && !scanner.isPaused && scanner.hasScanned && scanner.stats.files > 0) {
       history.saveScan(usernameRef.current, scanner.stats.files, scanner.stats.files, scanner.matches)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanner.isScanning, scanner.isPaused])
 
-  const handleScan = (username: string, token: string, saveToken: boolean) => {
-    if (!username) return
-    usernameRef.current = username
+  const handleScan = (target: string, token: string, saveToken: boolean, mode: ScanMode) => {
+    if (!target) return
+    usernameRef.current = target
     tokenRef.current = token
-    history.persistCredentials(username, token, saveToken)
-    scanner.startScan(username, token)
+    history.persistCredentials(target, token, saveToken)
+    scanner.startScan(target, token, mode)
   }
 
   const handleHistorySelect = (username: string) => {
@@ -58,6 +57,7 @@ function HomePage() {
           isPaused={scanner.isPaused}
           savedUsername={history.savedUsername}
           savedToken={history.savedToken}
+          savedRemember={history.rememberToken}
         />
       </div>
 

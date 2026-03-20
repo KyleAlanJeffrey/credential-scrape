@@ -1,16 +1,21 @@
 import { useState, useEffect, useRef } from 'react'
 
+export type ScanMode = 'account' | 'repo'
+
 interface SearchBarProps {
-  onScan: (username: string, token: string, saveToken: boolean) => void
+  onScan: (target: string, token: string, saveToken: boolean, mode: ScanMode) => void
   onStop: () => void
   isScanning: boolean
   isPaused: boolean
   savedUsername: string
   savedToken: string
+  savedRemember: boolean
 }
 
-export default function SearchBar({ onScan, onStop, isScanning, isPaused, savedUsername, savedToken }: SearchBarProps) {
+export default function SearchBar({ onScan, onStop, isScanning, isPaused, savedUsername, savedToken, savedRemember }: SearchBarProps) {
+  const [mode, setMode] = useState<ScanMode>('account')
   const [username, setUsername] = useState('')
+  const [repoInput, setRepoInput] = useState('')
   const [token, setToken] = useState('')
   const [saveToken, setSaveToken] = useState(false)
   const [showTokenInfo, setShowTokenInfo] = useState(false)
@@ -19,11 +24,9 @@ export default function SearchBar({ onScan, onStop, isScanning, isPaused, savedU
 
   useEffect(() => {
     if (savedUsername) setUsername(savedUsername)
-    if (savedToken) {
-      setToken(savedToken)
-      setSaveToken(true)
-    }
-  }, [savedUsername, savedToken])
+    if (savedToken) setToken(savedToken)
+    setSaveToken(savedRemember)
+  }, [savedUsername, savedToken, savedRemember])
 
   useEffect(() => {
     if (!showTokenInfo) return
@@ -39,28 +42,67 @@ export default function SearchBar({ onScan, onStop, isScanning, isPaused, savedU
     return () => document.removeEventListener('mousedown', handleClick)
   }, [showTokenInfo])
 
+  const target = mode === 'account' ? username : repoInput
+  const setTarget = mode === 'account' ? setUsername : setRepoInput
+
   const handleSubmit = () => {
     if (isScanning) {
       onStop()
     } else {
-      onScan(username.trim(), token.trim(), saveToken)
+      onScan(target.trim(), token.trim(), saveToken, mode)
     }
   }
 
   const buttonText = isScanning ? 'Stop' : isPaused ? 'Continue' : 'Scan'
+  const placeholder = mode === 'account'
+    ? 'GitHub username'
+    : 'owner/repo or GitHub URL'
+
+  // Parse repo input for detection badge
+  const parsedRepo = (() => {
+    if (mode !== 'repo' || !repoInput.trim()) return null
+    try {
+      const input = repoInput.trim()
+      const url = (() => { try { return new URL(input) } catch { return null } })()
+      if (url && (url.hostname === 'github.com' || url.hostname === 'www.github.com')) {
+        const parts = url.pathname.split('/').filter(Boolean)
+        if (parts.length >= 2) return { owner: parts[0]!, repo: parts[1]!, fromUrl: true }
+      }
+      const slash = input.indexOf('/')
+      if (slash > 0 && slash < input.length - 1) {
+        return { owner: input.slice(0, slash), repo: input.slice(slash + 1), fromUrl: false }
+      }
+    } catch { /* ignore */ }
+    return null
+  })()
 
   return (
     <>
+      <div className="scan-mode-tabs">
+        <button
+          className={`scan-mode-tab${mode === 'account' ? ' active' : ''}`}
+          onClick={() => setMode('account')}
+        >
+          Account
+        </button>
+        <button
+          className={`scan-mode-tab${mode === 'repo' ? ' active' : ''}`}
+          onClick={() => setMode('repo')}
+        >
+          Repository
+        </button>
+      </div>
+
       <div className="search-box">
         <div className="search-row">
           <input
             id="username"
             type="text"
-            placeholder="GitHub username"
+            placeholder={placeholder}
             autoComplete="off"
             spellCheck={false}
-            value={username}
-            onChange={e => setUsername(e.target.value)}
+            value={target}
+            onChange={e => setTarget(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !isScanning) handleSubmit() }}
           />
           <button
@@ -71,6 +113,9 @@ export default function SearchBar({ onScan, onStop, isScanning, isPaused, savedU
             {buttonText}
           </button>
         </div>
+        {mode === 'repo' && parsedRepo && (
+          <span className="repo-detected" title={`${parsedRepo.owner}/${parsedRepo.repo}`}>&#10003;</span>
+        )}
       </div>
 
       <div className="token-row">

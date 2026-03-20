@@ -59,7 +59,7 @@ async function decompressData(b64: string): Promise<string> {
 export async function createShareUrl(matches: Match[]): Promise<string> {
   const data = JSON.stringify(matches)
   const compressed = await compressData(data)
-  return location.origin + location.pathname + '#results=' + compressed
+  return location.origin + '/results/shared#results=' + compressed
 }
 
 export async function restoreFromHash(): Promise<Match[] | null> {
