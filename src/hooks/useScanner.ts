@@ -218,18 +218,20 @@ export function useScanner() {
       } else {
         // Account mode: target is a username
         setResolvedName(target)
+        let isOwnAccount = false
         if (token) {
           const { json: me } = await client.request('/user')
           login = me.login
-          if (login.toLowerCase() !== target.toLowerCase()) {
-            throw new Error(`Token belongs to "${login}" but you entered "${target}".`)
+          isOwnAccount = login.toLowerCase() === target.toLowerCase()
+          if (!isOwnAccount) {
+            addMessage('info', `Scanning ${target}'s public repos using your token for higher rate limits.`)
           }
         } else {
           addMessage('info', 'No token — scanning public repos only (rate limit ~60 req/hr). Add a token above for private repos and higher limits.')
         }
 
         setStatus({ text: 'Fetching repository list…', rateLimited: false })
-        repos = await fetchReposForAccount(client, target, login, token)
+        repos = await fetchReposForAccount(client, target, login, token && isOwnAccount ? token : '')
       }
 
       setStats(s => ({ ...s, repos: repos.length }))
