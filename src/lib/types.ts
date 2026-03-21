@@ -22,6 +22,8 @@ export interface Match extends FileMatch {
   branch: string
   path: string
   html_url: string
+  commitSha?: string
+  commitMsg?: string
 }
 
 export interface Message {
@@ -51,4 +53,6 @@ export interface ScanJob {
   branch: string
   path: string
   sha: string
+  commitSha?: string
+  commitMsg?: string
 }

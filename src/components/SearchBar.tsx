@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 export type ScanMode = 'account' | 'repo'
 
 interface SearchBarProps {
-  onScan: (target: string, token: string, saveToken: boolean, mode: ScanMode) => void
+  onScan: (target: string, token: string, saveToken: boolean, mode: ScanMode, deepScan: boolean) => void
   onStop: () => void
   isScanning: boolean
   isPaused: boolean
@@ -32,6 +32,7 @@ export default function SearchBar({ onScan, onStop, isScanning, isPaused, savedU
   const [repoInput, setRepoInput] = usePersistedInput('input_repo', '')
   const [token, setToken] = useState('')
   const [saveToken, setSaveToken] = useState(false)
+  const [deepScan, setDeepScan] = useState(false)
   const [showTokenInfo, setShowTokenInfo] = useState(false)
   const popoverRef = useRef<HTMLDivElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -66,7 +67,7 @@ export default function SearchBar({ onScan, onStop, isScanning, isPaused, savedU
     if (isScanning) {
       onStop()
     } else {
-      onScan(target.trim(), token.trim(), saveToken, mode)
+      onScan(target.trim(), token.trim(), saveToken, mode, deepScan)
     }
   }
 
@@ -187,6 +188,20 @@ export default function SearchBar({ onScan, onStop, isScanning, isPaused, savedU
             </div>
           )}
         </div>
+      </div>
+
+      <div className="deep-scan-row">
+        <label className="deep-scan-toggle">
+          <input
+            type="checkbox"
+            checked={deepScan}
+            onChange={e => setDeepScan(e.target.checked)}
+            disabled={isScanning || isPaused}
+          />
+          <span className="deep-scan-check" />
+          <span className="deep-scan-label">Deep scan</span>
+          <span className="deep-scan-hint">Search full git history for deleted secrets</span>
+        </label>
       </div>
     </>
   )

@@ -20,6 +20,7 @@ export default function ResultCard({ match: m }: ResultCardProps) {
     <div className={`match severity-${sev}`}>
       <div className="match-top">
         <span className={`badge ${sev}`}>{m.severity}</span>
+        {m.commitSha && <span className="badge history" title={`Found in commit ${m.commitSha.slice(0, 7)}${m.commitMsg ? ': ' + m.commitMsg : ''}`}>history</span>}
         <span className="match-pattern">{m.pattern}</span>
         <a
           className="match-link"
@@ -28,6 +29,7 @@ export default function ResultCard({ match: m }: ResultCardProps) {
           rel="noopener noreferrer"
         >
           {m.repo} / {m.path} :{m.line}
+          {m.commitSha && <span className="commit-ref"> @ {m.commitSha.slice(0, 7)}</span>}
         </a>
       </div>
 
