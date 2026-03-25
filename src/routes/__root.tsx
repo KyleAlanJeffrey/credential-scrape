@@ -7,6 +7,8 @@ import { HeadContent, Link, Scripts, createRootRouteWithContext } from "@tanstac
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import type { ReactNode } from "react";
 
+import { KyleBadge } from "@kylealanjeffrey/badge";
+
 import appCss from "../styles.css?url";
 
 // ── Query Client (singleton) ────────────────────────────────────────────────
@@ -116,6 +118,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
             ]}
           />
         </QueryProvider>
+        <KyleBadge />
         <Scripts />
       </body>
     </html>
