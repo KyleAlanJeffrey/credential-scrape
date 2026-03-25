@@ -94,16 +94,17 @@ export function useScanner() {
 
     async function next() {
       if (signal.aborted || state.idx >= jobs.length) return
-      const { repo, branch, path, sha } = jobs[state.idx++]!
+      const job = jobs[state.idx++]!
+      const { repo, branch, path, sha, commitSha, commitMsg } = job
       inFlight++
 
       setStatus({
-        text: `<span class="repo-name">${esc(repo.full_name)}</span> <span class="file-path">/ ${esc(path)}</span>`,
+        text: `<span class="repo-name">${esc(repo.full_name)}</span> <span class="file-path">/ ${esc(path)}</span>${commitSha ? ' <span class="history-tag">history</span>' : ''}`,
         rateLimited: false,
       })
 
       try {
-        const res = await scanFile(client, repo, branch, path, sha)
+        const res = await scanFile(client, repo, branch, path, sha, commitSha, commitMsg)
         state.done++
         const pct = Math.round((state.done / jobs.length) * 100)
         setStats(s => ({ ...s, files: state.done, matches: allMatches.length + (res?.length || 0) }))
@@ -165,7 +166,7 @@ export function useScanner() {
     return [json]
   }
 
-  const startScan = useCallback(async (target: string, token: string, mode: ScanMode = 'account') => {
+  const startScan = useCallback(async (target: string, token: string, mode: ScanMode = 'account', deepScan = false) => {
     if (!target) return
 
     // Resume from paused state if same target
@@ -218,18 +219,20 @@ export function useScanner() {
       } else {
         // Account mode: target is a username
         setResolvedName(target)
+        let isOwnAccount = false
         if (token) {
           const { json: me } = await client.request('/user')
           login = me.login
-          if (login.toLowerCase() !== target.toLowerCase()) {
-            throw new Error(`Token belongs to "${login}" but you entered "${target}".`)
+          isOwnAccount = login.toLowerCase() === target.toLowerCase()
+          if (!isOwnAccount) {
+            addMessage('info', `Scanning ${target}'s public repos using your token for higher rate limits.`)
           }
         } else {
           addMessage('info', 'No token — scanning public repos only (rate limit ~60 req/hr). Add a token above for private repos and higher limits.')
         }
 
         setStatus({ text: 'Fetching repository list…', rateLimited: false })
-        repos = await fetchReposForAccount(client, target, login, token)
+        repos = await fetchReposForAccount(client, target, login, token && isOwnAccount ? token : '')
       }
 
       setStats(s => ({ ...s, repos: repos.length }))
@@ -264,6 +267,69 @@ export function useScanner() {
         }
 
         filterTree(tree, jobs, repo, branch)
+      }
+
+      // Deep scan: iterate commit history and collect unique blobs not in HEAD
+      if (deepScan) {
+        const seenBlobs = new Set(jobs.map(j => j.sha))
+        for (const repo of repos) {
+          if (signal.aborted) break
+          setStatus({
+            text: `<span class="repo-name">${esc(repo.full_name)}</span> — scanning commit history…`,
+            rateLimited: false,
+          })
+
+          let commits: any[]
+          try {
+            commits = await client.paged(`/repos/${repo.owner.login}/${repo.name}/commits?per_page=100`)
+          } catch (e: unknown) {
+            if (e instanceof DOMException && e.name === 'AbortError') break
+            addMessage('error', `${repo.full_name} commits: ${e instanceof Error ? e.message : String(e)}`)
+            continue
+          }
+
+          // Skip first commit (HEAD) since we already scanned the HEAD tree
+          for (let ci = 1; ci < commits.length; ci++) {
+            if (signal.aborted) break
+            const commit = commits[ci]!
+            const csha = commit.sha as string
+            const cmsg = ((commit.commit?.message || '') as string).split('\n')[0]!.slice(0, 80)
+
+            setStatus({
+              text: `<span class="repo-name">${esc(repo.full_name)}</span> — commit ${ci}/${commits.length - 1}`,
+              rateLimited: false,
+            })
+
+            let tree: any[]
+            try {
+              const { json } = await client.request(
+                `/repos/${repo.owner.login}/${repo.name}/git/trees/${csha}?recursive=1`,
+              )
+              tree = json.tree || []
+            } catch (e: unknown) {
+              if (e instanceof DOMException && e.name === 'AbortError') break
+              // 404 or 409 for empty/broken commits — skip silently
+              if (e instanceof Error && (e.message.includes('404') || e.message.includes('409'))) continue
+              continue
+            }
+
+            for (const f of tree) {
+              if (f.type !== 'blob') continue
+              if (seenBlobs.has(f.sha)) continue
+              seenBlobs.add(f.sha)
+              if (SKIP_DIRS.some((d: string) => f.path.includes(d))) continue
+              if (typeof f.size === 'number' && f.size > MAX_FILE_SIZE) continue
+              const dot = f.path.lastIndexOf('.')
+              if (dot !== -1 && SKIP_EXT.has(f.path.slice(dot).toLowerCase())) continue
+              const name = f.path.split('/').pop()
+              if (SKIP_FILENAMES.has(name)) continue
+              jobs.push({ repo, branch: repo.default_branch || 'main', path: f.path, sha: f.sha, commitSha: csha, commitMsg: cmsg })
+            }
+          }
+        }
+
+        // Update file count after adding history jobs
+        setStats(s => ({ ...s, files: 0 }))
       }
 
       const state: ScanRunState = { jobs, idx: 0, done: 0, allMatches, token, username: target, login }

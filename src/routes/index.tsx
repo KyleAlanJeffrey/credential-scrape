@@ -48,11 +48,11 @@ function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scanner.isScanning, scanner.isPaused])
 
-  const handleScan = (target: string, token: string, saveToken: boolean, mode: ScanMode) => {
+  const handleScan = (target: string, token: string, saveToken: boolean, mode: ScanMode, deepScan: boolean) => {
     if (!target) return
     tokenRef.current = token
     history.persistCredentials(token, saveToken)
-    scanner.startScan(target, token, mode)
+    scanner.startScan(target, token, mode, deepScan)
   }
 
   return (

@@ -40,6 +40,8 @@ export async function scanFile(
   branch: string,
   path: string,
   sha: string,
+  commitSha?: string,
+  commitMsg?: string,
 ): Promise<Match[]> {
   let raw: string
   if (sha) {
@@ -56,11 +58,13 @@ export async function scanFile(
   const u8 = new Uint8Array(raw.length)
   for (let i = 0; i < raw.length; i++) u8[i] = raw.charCodeAt(i)
   if (looksBinary(u8)) return []
+  const ref = commitSha || branch
   return matchFile(dec.decode(u8)).map(m => ({
     repo: `${repo.owner.login}/${repo.name}`,
     branch,
     path,
-    html_url: `https://github.com/${repo.owner.login}/${repo.name}/blob/${encodeURIComponent(branch)}/${path}#L${m.line}`,
+    html_url: `https://github.com/${repo.owner.login}/${repo.name}/blob/${encodeURIComponent(ref)}/${path}#L${m.line}`,
+    ...(commitSha ? { commitSha, commitMsg } : {}),
     ...m,
   }))
 }

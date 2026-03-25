@@ -870,6 +870,104 @@ body.scanned .token-row { max-width: 680px; }
   color: var(--color-dim);
 }
 
+/* ── Deep scan toggle ── */
+.deep-scan-row {
+  margin-top: 10px;
+  width: 100%;
+  max-width: 500px;
+  transition: max-width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body.scanned .deep-scan-row { max-width: 680px; }
+
+.deep-scan-toggle {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.deep-scan-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.deep-scan-check {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.deep-scan-toggle:hover .deep-scan-check {
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+.deep-scan-toggle input:checked + .deep-scan-check {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+.deep-scan-toggle input:checked + .deep-scan-check::after {
+  content: '';
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) translate(-0.5px, -0.5px);
+}
+
+.deep-scan-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-dim);
+  white-space: nowrap;
+}
+
+.deep-scan-hint {
+  font-size: 10px;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.deep-scan-toggle input:disabled ~ .deep-scan-check {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.deep-scan-toggle:has(input:disabled) {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* ── History tag in status line ── */
+.history-tag {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #a78bfa;
+  background: rgba(139, 92, 246, 0.12);
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
+/* ── Commit ref in result card ── */
+.commit-ref {
+  color: #a78bfa;
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
 /* ── Results area ── */
 .results-area {
   max-width: 720px;
@@ -1143,6 +1241,7 @@ body.scanned .token-row { max-width: 680px; }
 .badge.critical { background: rgba(244, 63, 94, 0.15); color: #fc8095; border-color: rgba(244,63,94,0.28); }
 .badge.high     { background: rgba(251, 191, 36, 0.12); color: #fcd34d; border-color: rgba(251,191,36,0.26); }
 .badge.medium   { background: rgba(165, 180, 252, 0.1); color: #b4bcff; border-color: rgba(165,180,252,0.22); }
+.badge.history  { background: rgba(139, 92, 246, 0.12); color: #a78bfa; border-color: rgba(139,92,246,0.25); }
 
 .match-pattern { font-size: 13px; color: var(--color-text); font-weight: 500; }
 
