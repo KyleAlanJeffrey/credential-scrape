@@ -33,7 +33,7 @@ function QueryProvider({ children }: { children: ReactNode }) {
 // ── SEO ─────────────────────────────────────────────────────────────────────
 
 const SITE_NAME = "Secret Scanner";
-const SITE_URL = "https://scraper.kylejeffrey.com";
+const SITE_URL = "https://secret-scanner.com";
 const DEFAULT_DESCRIPTION =
   "Free online tool to scan GitHub repositories for leaked API keys, tokens, passwords, and secrets. Detect 40+ credential patterns including AWS keys, Stripe keys, OpenAI tokens, private keys, and database connection strings. Runs entirely in the browser.";
 const DEFAULT_KEYWORDS =

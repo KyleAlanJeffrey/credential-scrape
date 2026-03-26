@@ -4,6 +4,7 @@ A client-side web app that scans a GitHub user's repositories for leaked credent
 
 ## Tech Stack
 
+- **URL**: https://secret-scanner.com
 - **Framework**: React 19 + TanStack Start (SSR) + TanStack Router
 - **Build**: Vite 7
 - **Styling**: Tailwind CSS v4 + custom CSS theme
