@@ -1,0 +1,18 @@
+{
+    "framework": [
+        "React 19",
+        "TanStack",
+        "Vite 7"
+    ],
+    "language": [
+        "TypeScript"
+    ],
+    "host": [
+        "Cloudflare Workers"
+    ],
+    "libraries": [
+        "TanStack Query",
+        "clsx",
+        "tailwind-merge"
+    ]
+}
